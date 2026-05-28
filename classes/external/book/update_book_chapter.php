@@ -56,7 +56,7 @@ class update_book_chapter extends external_api {
         require_capability('local/activity_utils:updatebook', $coursecontext);
         require_capability('mod/book:edit', $context);
 
-        
+        $transaction = $DB->start_delegated_transaction();
         $updated = false;
 
         if ($params['title'] !== null) {
@@ -99,6 +99,7 @@ class update_book_chapter extends external_api {
         }
 
         rebuild_course_cache($course->id, true);
+        $transaction->allow_commit();
 
         return [
             'id' => $chapter->id,

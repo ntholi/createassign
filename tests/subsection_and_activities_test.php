@@ -8,10 +8,10 @@ require_once($CFG->libdir . '/externallib.php');
 
 use advanced_testcase;
 use context_course;
-use local_activity_utils\external\create_subsection;
-use local_activity_utils\external\create_page;
-use local_activity_utils\external\create_assignment;
-use local_activity_utils\external\create_file;
+use local_activity_utils\external\assignment\create_assignment;
+use local_activity_utils\external\file\create_file;
+use local_activity_utils\external\page\create_page;
+use local_activity_utils\external\section\create_subsection;
 
 class subsection_and_activities_test extends advanced_testcase {
 
@@ -52,12 +52,16 @@ class subsection_and_activities_test extends advanced_testcase {
         $section = $DB->get_record('course_sections', ['id' => $result['id']]);
         $this->assertNotNull($section);
         $this->assertEquals('mod_subsection', $section->component);
-        $this->assertEquals($result['id'], $section->itemid);
-        $this->assertEquals(1, $section->visible);
-
         $cm = $DB->get_record('course_modules', ['id' => $result['coursemoduleid']]);
         $this->assertNotNull($cm);
-        $this->assertEquals(1, $cm->section);
+        $this->assertEquals($cm->instance, $section->itemid);
+        $this->assertEquals(1, $section->visible);
+
+        $parentsection = $DB->get_record('course_sections', [
+            'course' => $this->course->id,
+            'section' => 1,
+        ]);
+        $this->assertEquals($parentsection->id, $cm->section);
     }
 
     public function test_subsection_in_parent_sequence(): void {

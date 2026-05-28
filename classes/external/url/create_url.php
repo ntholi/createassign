@@ -52,56 +52,21 @@ class create_url extends external_api {
         require_capability('local/activity_utils:createurl', $context);
         require_capability('mod/url:addinstance', $context);
 
-        $url = new \stdClass();
-        $url->course = $params['courseid'];
-        $url->name = $params['name'];
-        $url->intro = $params['intro'];
-        $url->introformat = FORMAT_HTML;
-        $url->externalurl = $params['externalurl'];
-        $url->display = $params['display'];
-        $url->displayoptions = 'a:1:{s:10:"printintro";i:1;}';
-        $url->parameters = 'a:0:{}';
-        $url->timemodified = time();
-
-        $urlid = $DB->insert_record('url', $url);
-
-        $moduleid = $DB->get_field('modules', 'id', ['name' => 'url'], MUST_EXIST);
-
-        $cm = new \stdClass();
-        $cm->course = $params['courseid'];
-        $cm->module = $moduleid;
-        $cm->instance = $urlid;
-        $cm->section = $params['section'];
-        $cm->idnumber = '';
-        $cm->added = time();
-        $cm->score = 0;
-        $cm->indent = 0;
-        $cm->visible = $params['visible'];
-        $cm->visibleoncoursepage = 1;
-        $cm->visibleold = $params['visible'];
-        $cm->groupmode = 0;
-        $cm->groupingid = 0;
-        $cm->completion = 0;
-        $cm->completionview = 0;
-        $cm->completionexpected = 0;
-        $cm->completionpassgrade = 0;
-        $cm->showdescription = 0;
-        $cm->availability = null;
-        $cm->deletioninprogress = 0;
-        $cm->downloadcontent = 1;
-        $cm->lang = '';
-        $cm->completiongradeitemnumber = null;
-
-        $cmid = $DB->insert_record('course_modules', $cm);
-
-        
-        helper::add_module_to_section($params['courseid'], $params['section'], $cmid, $params['visible']);
+        $moduleinfo = helper::create_module($course, 'url', $params['section'], $params['name'], $params['visible'], [
+            'intro' => $params['intro'],
+            'introformat' => FORMAT_HTML,
+            'externalurl' => $params['externalurl'],
+            'display' => $params['display'],
+            'printintro' => 1,
+            'popupwidth' => 620,
+            'popupheight' => 450,
+        ]);
 
         rebuild_course_cache($params['courseid'], true);
 
         return [
-            'id' => $urlid,
-            'coursemoduleid' => $cmid,
+            'id' => $moduleinfo->instance,
+            'coursemoduleid' => $moduleinfo->coursemodule,
             'name' => $params['name'],
             'externalurl' => $params['externalurl'],
             'success' => true,

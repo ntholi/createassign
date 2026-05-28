@@ -28,6 +28,7 @@ class create_subsection extends external_api {
         global $CFG, $DB;
 
         require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->dirroot . '/course/modlib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'courseid' => $courseid,
@@ -49,78 +50,50 @@ class create_subsection extends external_api {
             throw new \moodle_exception('subsectionmodulenotfound', 'local_activity_utils');
         }
 
-        $parentsectionrecord = $DB->get_record('course_sections', [
+        $DB->get_record('course_sections', [
             'course' => $params['courseid'],
             'section' => $params['parentsection']
+        ], 'id', MUST_EXIST);
+
+        $moduleinfo = new \stdClass();
+        $moduleinfo->modulename = 'subsection';
+        $moduleinfo->module = $subsectionmodule->id;
+        $moduleinfo->course = $params['courseid'];
+        $moduleinfo->section = $params['parentsection'];
+        $moduleinfo->name = $params['name'];
+        $moduleinfo->visible = $params['visible'];
+        $moduleinfo->visibleoncoursepage = 1;
+        $moduleinfo->cmidnumber = '';
+        $moduleinfo->groupmode = 0;
+        $moduleinfo->groupingid = 0;
+        $moduleinfo->completion = 0;
+        $moduleinfo->completionview = 0;
+        $moduleinfo->completionexpected = 0;
+        $moduleinfo->completionpassgrade = 0;
+        $moduleinfo->completiongradeitemnumber = null;
+        $moduleinfo->showdescription = 0;
+        $moduleinfo->availability = null;
+        $moduleinfo->downloadcontent = 1;
+
+        $transaction = $DB->start_delegated_transaction();
+        $moduleinfo = add_moduleinfo($moduleinfo, $course);
+
+        $sectiondata = $DB->get_record('course_sections', [
+            'course' => $params['courseid'],
+            'component' => 'mod_subsection',
+            'itemid' => $moduleinfo->instance,
         ], '*', MUST_EXIST);
 
-        $maxsection = $DB->get_field_sql(
-            'SELECT MAX(section) FROM {course_sections} WHERE course = ?',
-            [$params['courseid']]
-        );
-        $newsectionnum = $maxsection + 1;
-
-        $subsection = new \stdClass();
-        $subsection->course = $params['courseid'];
-        $subsection->name = $params['name'];
-        $subsection->timemodified = time();
-
-        $subsectionid = $DB->insert_record('subsection', $subsection);
-
-        $cm = new \stdClass();
-        $cm->course = $params['courseid'];
-        $cm->module = $subsectionmodule->id;
-        $cm->instance = $subsectionid;
-        $cm->section = $params['parentsection'];
-        $cm->idnumber = '';
-        $cm->added = time();
-        $cm->score = 0;
-        $cm->indent = 0;
-        $cm->visible = $params['visible'];
-        $cm->visibleoncoursepage = 1;
-        $cm->visibleold = $params['visible'];
-        $cm->groupmode = 0;
-        $cm->groupingid = 0;
-        $cm->completion = 0;
-        $cm->completionview = 0;
-        $cm->completionexpected = 0;
-        $cm->completionpassgrade = 0;
-        $cm->showdescription = 0;
-        $cm->availability = null;
-        $cm->deletioninprogress = 0;
-        $cm->downloadcontent = 1;
-        $cm->lang = '';
-        $cm->completiongradeitemnumber = null;
-
-        $cmid = $DB->insert_record('course_modules', $cm);
-
-        if (!empty($parentsectionrecord->sequence)) {
-            $sequence = $parentsectionrecord->sequence . ',' . $cmid;
-        } else {
-            $sequence = $cmid;
-        }
-        $DB->set_field('course_sections', 'sequence', $sequence, ['id' => $parentsectionrecord->id]);
-
-        $sectiondata = new \stdClass();
-        $sectiondata->course = $params['courseid'];
-        $sectiondata->section = $newsectionnum;
-        $sectiondata->name = $params['name'];
         $sectiondata->summary = $params['summary'];
         $sectiondata->summaryformat = FORMAT_HTML;
-        $sectiondata->visible = $params['visible'];
         $sectiondata->timemodified = time();
-        
-        $sectiondata->component = 'mod_subsection';
-        $sectiondata->itemid = $subsectionid;
-
-        $sectionid = $DB->insert_record('course_sections', $sectiondata);
-
-        rebuild_course_cache($params['courseid'], true);
+        $DB->update_record('course_sections', $sectiondata);
+        $transaction->allow_commit();
 
         return [
-            'id' => $sectionid,
-            'sectionnum' => $newsectionnum,
-            'coursemoduleid' => $cmid,
+            'id' => $sectiondata->id,
+            'sectionnum' => $sectiondata->section,
+            'coursemoduleid' => $moduleinfo->coursemodule,
             'parentsection' => $params['parentsection'],
             'name' => $params['name'],
             'success' => true,

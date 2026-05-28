@@ -82,57 +82,18 @@ class create_book extends external_api {
         
         $navstyle = max(0, min(2, $params['navstyle']));
 
-        
-        $book = new \stdClass();
-        $book->course = $params['courseid'];
-        $book->name = $params['name'];
-        $book->intro = $params['intro'];
-        $book->introformat = FORMAT_HTML;
-        $book->numbering = $numbering;
-        $book->navstyle = $navstyle;
-        $book->customtitles = $params['customtitles'] ? 1 : 0;
-        $book->revision = 1;
-        $book->timecreated = time();
-        $book->timemodified = time();
+        $transaction = $DB->start_delegated_transaction();
+        $moduleinfo = helper::create_module($course, 'book', $params['section'], $params['name'], $params['visible'], [
+            'intro' => $params['intro'],
+            'introformat' => FORMAT_HTML,
+            'numbering' => $numbering,
+            'navstyle' => $navstyle,
+            'customtitles' => $params['customtitles'] ? 1 : 0,
+            'revision' => 1,
+        ]);
 
-        $bookid = $DB->insert_record('book', $book);
-
-        
-        $moduleid = $DB->get_field('modules', 'id', ['name' => 'book'], MUST_EXIST);
-
-        
-        $cm = new \stdClass();
-        $cm->course = $params['courseid'];
-        $cm->module = $moduleid;
-        $cm->instance = $bookid;
-        $cm->section = $params['section'];
-        $cm->idnumber = '';
-        $cm->added = time();
-        $cm->score = 0;
-        $cm->indent = 0;
-        $cm->visible = $params['visible'];
-        $cm->visibleoncoursepage = 1;
-        $cm->visibleold = $params['visible'];
-        $cm->groupmode = 0;
-        $cm->groupingid = 0;
-        $cm->completion = 0;
-        $cm->completionview = 0;
-        $cm->completionexpected = 0;
-        $cm->completionpassgrade = 0;
-        $cm->showdescription = 0;
-        $cm->availability = null;
-        $cm->deletioninprogress = 0;
-        $cm->downloadcontent = 1;
-        $cm->lang = '';
-        $cm->completiongradeitemnumber = null;
-
-        $cmid = $DB->insert_record('course_modules', $cm);
-
-        
-        helper::add_module_to_section($params['courseid'], $params['section'], $cmid, $params['visible']);
-
-        
-        $modulecontext = \context_module::instance($cmid);
+        $bookid = $moduleinfo->instance;
+        $modulecontext = \context_module::instance($moduleinfo->coursemodule);
 
         
         $createdchapters = [];
@@ -174,10 +135,11 @@ class create_book extends external_api {
 
         
         rebuild_course_cache($params['courseid'], true);
+        $transaction->allow_commit();
 
         return [
             'id' => $bookid,
-            'coursemoduleid' => $cmid,
+            'coursemoduleid' => $moduleinfo->coursemodule,
             'name' => $params['name'],
             'chaptercount' => count($createdchapters),
             'chapters' => $createdchapters,

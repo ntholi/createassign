@@ -43,11 +43,11 @@ class update_page extends external_api {
         $page = $DB->get_record('page', ['id' => $params['pageid']], '*', MUST_EXIST);
         $cm = get_coursemodule_from_instance('page', $page->id, 0, false, MUST_EXIST);
         $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
-        $context = \context_course::instance($course->id);
+        $context = \context_module::instance($cm->id);
 
         self::validate_context($context);
-        require_capability('local/activity_utils:updatepage', $context);
-        require_capability('mod/page:addinstance', $context);
+        require_capability('local/activity_utils:updatepage', \context_course::instance($course->id));
+        require_capability('moodle/course:manageactivities', $context);
 
         
         $updated = false;
@@ -73,9 +73,7 @@ class update_page extends external_api {
 
         
         if ($params['visible'] !== null) {
-            $cm->visible = $params['visible'];
-            $cm->visibleold = $params['visible'];
-            $DB->update_record('course_modules', $cm);
+            set_coursemodule_visible($cm->id, $params['visible'], 1, false);
         }
 
         rebuild_course_cache($course->id, true);

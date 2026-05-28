@@ -61,7 +61,7 @@ class add_book_chapter extends external_api {
         require_capability('local/activity_utils:createbook', \context_course::instance($course->id));
         require_capability('mod/book:edit', $context);
 
-        
+        $transaction = $DB->start_delegated_transaction();
         $maxpagenum = $DB->get_field_sql('SELECT MAX(pagenum) FROM {book_chapters} WHERE bookid = ?', [$book->id]);
         $maxpagenum = $maxpagenum ? (int)$maxpagenum : 0;
 
@@ -108,6 +108,7 @@ class add_book_chapter extends external_api {
 
         
         rebuild_course_cache($course->id, true);
+        $transaction->allow_commit();
 
         return [
             'id' => $chapterid,

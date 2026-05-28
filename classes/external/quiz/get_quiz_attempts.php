@@ -55,7 +55,7 @@ class get_quiz_attempts extends external_api {
                 }
             }
 
-            $attemptsarray[] = [
+            $attemptdata = [
                 'id' => (int)$attempt->id,
                 'userid' => (int)$attempt->userid,
                 'attempt' => (int)$attempt->attempt,
@@ -63,9 +63,12 @@ class get_quiz_attempts extends external_api {
                 'timestart' => (int)$attempt->timestart,
                 'timefinish' => (int)($attempt->timefinish ?? 0),
                 'timemodified' => (int)$attempt->timemodified,
-                'sumgrades' => $attempt->sumgrades !== null ? (float)$attempt->sumgrades : null,
                 'user' => $usercache[$attempt->userid],
             ];
+            if ($attempt->sumgrades !== null) {
+                $attemptdata['sumgrades'] = (float)$attempt->sumgrades;
+            }
+            $attemptsarray[] = $attemptdata;
         }
 
         return [

@@ -73,32 +73,43 @@ class get_quiz_attempt_details extends external_api {
                 }
             }
 
-            $questionsarray[] = [
+            $questiondata = [
                 'slot' => (int)$slot,
                 'type' => $question->qtype->name(),
                 'name' => $question->name,
                 'questiontext' => $question->questiontext,
                 'maxmark' => (float)$maxmark,
-                'mark' => $mark !== null ? (float)$mark : null,
                 'response' => $response ?? '',
                 'rightanswer' => $rightanswer ?? '',
                 'state' => $statename,
-                'feedback' => $feedback,
             ];
+            if ($mark !== null) {
+                $questiondata['mark'] = (float)$mark;
+            }
+            if ($feedback !== null && $feedback !== '') {
+                $questiondata['feedback'] = $feedback;
+            }
+            $questionsarray[] = $questiondata;
+        }
+
+        $attemptdata = [
+            'id' => (int)$attempt->id,
+            'userid' => (int)$attempt->userid,
+            'state' => $attempt->state,
+            'timestart' => (int)$attempt->timestart,
+            'timefinish' => (int)($attempt->timefinish ?? 0),
+            'questions' => $questionsarray,
+        ];
+        if ($attempt->sumgrades !== null) {
+            $attemptdata['sumgrades'] = (float)$attempt->sumgrades;
+        }
+        if ($grade !== null) {
+            $attemptdata['grade'] = (float)$grade;
         }
 
         return [
             'success' => true,
-            'attempt' => [
-                'id' => (int)$attempt->id,
-                'userid' => (int)$attempt->userid,
-                'state' => $attempt->state,
-                'timestart' => (int)$attempt->timestart,
-                'timefinish' => (int)($attempt->timefinish ?? 0),
-                'sumgrades' => $attempt->sumgrades !== null ? (float)$attempt->sumgrades : null,
-                'grade' => $grade !== null ? (float)$grade : null,
-                'questions' => $questionsarray,
-            ],
+            'attempt' => $attemptdata,
         ];
     }
 

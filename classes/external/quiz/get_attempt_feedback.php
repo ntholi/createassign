@@ -32,15 +32,14 @@ class get_attempt_feedback extends external_api {
 
         $feedbackrecord = $DB->get_record('quiz_attempt_feedback', ['attemptid' => $params['attemptid']]);
 
-        $feedback = null;
+        $result = [
+            'success' => true,
+        ];
         if ($feedbackrecord) {
-            $feedback = $feedbackrecord->feedback;
+            $result['feedback'] = $feedbackrecord->feedback;
         }
 
-        return [
-            'success' => true,
-            'feedback' => $feedback,
-        ];
+        return $result;
     }
 
     public static function execute_returns(): external_single_structure {

@@ -49,60 +49,24 @@ class create_page extends external_api {
         require_capability('local/activity_utils:createpage', $context);
         require_capability('mod/page:addinstance', $context);
 
-        $page = new \stdClass();
-        $page->course = $params['courseid'];
-        $page->name = $params['name'];
-        $page->intro = $params['intro'];
-        $page->introformat = FORMAT_HTML;
-        $page->content = $params['content'];
-        $page->contentformat = FORMAT_HTML;
-        $page->legacyfiles = 0;
-        $page->legacyfileslast = null;
-        $page->display = 5; 
-        $page->displayoptions = 'a:2:{s:12:"printheading";s:1:"1";s:10:"printintro";s:1:"0";}';
-        $page->revision = 1;
-        $page->timemodified = time();
-        $page->timecreated = time();
-
-        $pageid = $DB->insert_record('page', $page);
-
-        $moduleid = $DB->get_field('modules', 'id', ['name' => 'page'], MUST_EXIST);
-
-        $cm = new \stdClass();
-        $cm->course = $params['courseid'];
-        $cm->module = $moduleid;
-        $cm->instance = $pageid;
-        $cm->section = $params['section'];
-        $cm->idnumber = '';
-        $cm->added = time();
-        $cm->score = 0;
-        $cm->indent = 0;
-        $cm->visible = $params['visible'];
-        $cm->visibleoncoursepage = 1;
-        $cm->visibleold = $params['visible'];
-        $cm->groupmode = 0;
-        $cm->groupingid = 0;
-        $cm->completion = 0;
-        $cm->completionview = 0;
-        $cm->completionexpected = 0;
-        $cm->completionpassgrade = 0;
-        $cm->showdescription = 0;
-        $cm->availability = null;
-        $cm->deletioninprogress = 0;
-        $cm->downloadcontent = 1;
-        $cm->lang = '';
-        $cm->completiongradeitemnumber = null;
-
-        $cmid = $DB->insert_record('course_modules', $cm);
-
-        
-        helper::add_module_to_section($params['courseid'], $params['section'], $cmid, $params['visible']);
+        $moduleinfo = helper::create_module($course, 'page', $params['section'], $params['name'], $params['visible'], [
+            'intro' => $params['intro'],
+            'introformat' => FORMAT_HTML,
+            'content' => $params['content'],
+            'contentformat' => FORMAT_HTML,
+            'legacyfiles' => 0,
+            'legacyfileslast' => null,
+            'display' => 5,
+            'printintro' => 0,
+            'printlastmodified' => 0,
+            'revision' => 1,
+        ]);
 
         rebuild_course_cache($params['courseid'], true);
 
         return [
-            'id' => $pageid,
-            'coursemoduleid' => $cmid,
+            'id' => $moduleinfo->instance,
+            'coursemoduleid' => $moduleinfo->coursemodule,
             'name' => $params['name'],
             'success' => true,
             'message' => 'Page created successfully'

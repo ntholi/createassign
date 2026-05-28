@@ -37,6 +37,7 @@ $string['activity_utils:updateurl'] = 'Update URL resources via API';
 $string['activity_utils:deleteurl'] = 'Delete URL resources via API';
 
 $string['invalidfilename'] = 'Invalid filename provided';
+$string['sectionnotfound'] = 'Course section {$a} was not found';
 $string['invalidsubsection'] = 'The specified section is not a valid subsection';
 $string['subsectionmodulenotfound'] = 'Subsection module not found. This feature requires Moodle 5.0 or later with subsection support.';
 

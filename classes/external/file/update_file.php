@@ -46,13 +46,13 @@ class update_file extends external_api {
         $resource = $DB->get_record('resource', ['id' => $params['resourceid']], '*', MUST_EXIST);
         $cm = get_coursemodule_from_instance('resource', $resource->id, 0, false, MUST_EXIST);
         $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
-        $context = \context_course::instance($course->id);
+        $context = \context_module::instance($cm->id);
 
         self::validate_context($context);
-        require_capability('local/activity_utils:updatefile', $context);
-        require_capability('mod/resource:addinstance', $context);
+        require_capability('local/activity_utils:updatefile', \context_course::instance($course->id));
+        require_capability('moodle/course:manageactivities', $context);
 
-        
+        $transaction = $DB->start_delegated_transaction();
         $updated = false;
 
         if ($params['name'] !== null) {
@@ -159,12 +159,11 @@ class update_file extends external_api {
 
         
         if ($params['visible'] !== null) {
-            $cm->visible = $params['visible'];
-            $cm->visibleold = $params['visible'];
-            $DB->update_record('course_modules', $cm);
+            set_coursemodule_visible($cm->id, $params['visible'], 1, false);
         }
 
         rebuild_course_cache($course->id, true);
+        $transaction->allow_commit();
 
         return [
             'id' => $resource->id,

@@ -1,0 +1,21 @@
+# Activity Utils changelog
+
+## 2026-05-28
+
+### Fixed
+- Corrected PHPUnit imports for subsection/activity tests so they reference the real external API namespaces.
+- Replaced manual course section sequence editing in the shared module-placement helper with Moodle's `course_add_cm_to_section()` API.
+- Ensured course modules added through the helper are linked to the correct `course_sections.id` instead of relying on section numbers.
+- Refactored subsection creation to use Moodle's module creation flow for `mod_subsection`, preserving the existing API response while letting Moodle create the subsection instance, course module, delegated section, events, and caches.
+- Updated subsection tests to assert delegated-section metadata against the subsection instance id and parent course section id.
+- Fixed quiz attempt read services so optional response fields are omitted instead of returned as `null`.
+- Changed page and file update permissions to require existing-activity management rights instead of create-instance rights, and routed visibility changes through Moodle's visibility API.
+- Wrapped file resource create/update operations in delegated transactions to avoid orphaned modules or missing files after partial failures.
+- Wrapped subsection creation and delegated-section summary updates in one transaction.
+- Wrapped book chapter add/update writes in transactions.
+- Refactored page, URL, book, forum, and file creation to use Moodle's `add_moduleinfo()` lifecycle instead of direct `{course_modules}` inserts.
+- Refactored assignment creation to use Moodle's `assign_add_instance()` lifecycle through `add_moduleinfo()`, preserving file-submission plugin settings and intro attachments.
+- Refactored quiz creation to use Moodle's `quiz_add_instance()` lifecycle through `add_moduleinfo()`, including review bitmask conversion to Moodle's expected form-style review options.
+
+### Known follow-up
+- BigBlueButton creation still needs a dedicated `add_moduleinfo()` lifecycle refactor because it has module-specific meeting defaults.

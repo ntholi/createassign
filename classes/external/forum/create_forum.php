@@ -46,74 +46,41 @@ class create_forum extends external_api {
         $context = \context_course::instance($course->id);
 
         self::validate_context($context);
+        require_capability('local/activity_utils:createforum', $context);
         require_capability('mod/forum:addinstance', $context);
 
-        $forum = new \stdClass();
-        $forum->course = $params['courseid'];
-        $forum->name = $params['name'];
-        $forum->intro = $params['intro'];
-        $forum->introformat = FORMAT_HTML;
-        $forum->type = $params['type'];
-        $forum->assessed = 0;
-        $forum->assesstimestart = 0;
-        $forum->assesstimefinish = 0;
-        $forum->scale = 0;
-        $forum->maxbytes = 0;
-        $forum->maxattachments = 1;
-        $forum->forcesubscribe = 0;
-        $forum->trackingtype = 1;
-        $forum->rsstype = 0;
-        $forum->rssarticles = 0;
-        $forum->timemodified = time();
-        $forum->warnafter = 0;
-        $forum->blockafter = 0;
-        $forum->blockperiod = 0;
-        $forum->completiondiscussions = 0;
-        $forum->completionreplies = 0;
-        $forum->completionposts = 0;
-        $forum->displaywordcount = 0;
-        $forum->lockdiscussionafter = 0;
-        $forum->duedate = 0;
-        $forum->cutoffdate = 0;
-
-        $forumid = $DB->insert_record('forum', $forum);
-
-        $moduleid = $DB->get_field('modules', 'id', ['name' => 'forum'], MUST_EXIST);
-
-        $cm = new \stdClass();
-        $cm->course = $params['courseid'];
-        $cm->module = $moduleid;
-        $cm->instance = $forumid;
-        $cm->section = $params['section'];
-        $cm->idnumber = $params['idnumber'];
-        $cm->added = time();
-        $cm->score = 0;
-        $cm->indent = 0;
-        $cm->visible = 1;
-        $cm->visibleoncoursepage = 1;
-        $cm->visibleold = 1;
-        $cm->groupmode = 0;
-        $cm->groupingid = 0;
-        $cm->completion = 0;
-        $cm->completionview = 0;
-        $cm->completionexpected = 0;
-        $cm->completionpassgrade = 0;
-        $cm->showdescription = 0;
-        $cm->availability = null;
-        $cm->deletioninprogress = 0;
-        $cm->downloadcontent = 1;
-        $cm->lang = '';
-        $cm->completiongradeitemnumber = null;
-
-        $cmid = $DB->insert_record('course_modules', $cm);
-
-        helper::add_module_to_section($params['courseid'], $params['section'], $cmid, 1);
+        $moduleinfo = helper::create_module($course, 'forum', $params['section'], $params['name'], 1, [
+            'cmidnumber' => $params['idnumber'],
+            'intro' => $params['intro'],
+            'introformat' => FORMAT_HTML,
+            'type' => $params['type'],
+            'assessed' => 0,
+            'assesstimestart' => 0,
+            'assesstimefinish' => 0,
+            'scale' => 0,
+            'maxbytes' => 0,
+            'maxattachments' => 1,
+            'forcesubscribe' => 0,
+            'trackingtype' => 1,
+            'rsstype' => 0,
+            'rssarticles' => 0,
+            'warnafter' => 0,
+            'blockafter' => 0,
+            'blockperiod' => 0,
+            'completiondiscussions' => 0,
+            'completionreplies' => 0,
+            'completionposts' => 0,
+            'displaywordcount' => 0,
+            'lockdiscussionafter' => 0,
+            'duedate' => 0,
+            'cutoffdate' => 0,
+        ]);
 
         rebuild_course_cache($params['courseid'], true);
 
         return [
-            'id' => $forumid,
-            'coursemoduleid' => $cmid,
+            'id' => $moduleinfo->instance,
+            'coursemoduleid' => $moduleinfo->coursemodule,
             'name' => $params['name'],
             'success' => true,
             'message' => 'Forum created successfully'

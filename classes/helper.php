@@ -1,8 +1,6 @@
 <?php
 namespace local_activity_utils;
 
-use core_external\external_api;
-
 class helper {
 
     public static function get_section_by_number(int $courseid, int $sectionnum): ?\stdClass {
@@ -21,20 +19,57 @@ class helper {
         return $section ? (int)$section->id : null;
     }
 
+    public static function create_module(
+        \stdClass $course,
+        string $modulename,
+        int $sectionnum,
+        string $name,
+        int $visible,
+        array $properties = []
+    ): \stdClass {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->dirroot . '/course/modlib.php');
+
+        $moduleinfo = new \stdClass();
+        $moduleinfo->modulename = $modulename;
+        $moduleinfo->module = $DB->get_field('modules', 'id', ['name' => $modulename], MUST_EXIST);
+        $moduleinfo->course = $course->id;
+        $moduleinfo->section = $sectionnum;
+        $moduleinfo->name = $name;
+        $moduleinfo->visible = $visible;
+        $moduleinfo->visibleoncoursepage = 1;
+        $moduleinfo->cmidnumber = '';
+        $moduleinfo->groupmode = 0;
+        $moduleinfo->groupingid = 0;
+        $moduleinfo->completion = 0;
+        $moduleinfo->completionview = 0;
+        $moduleinfo->completionexpected = 0;
+        $moduleinfo->completionpassgrade = 0;
+        $moduleinfo->completiongradeitemnumber = null;
+        $moduleinfo->showdescription = 0;
+        $moduleinfo->availability = null;
+        $moduleinfo->downloadcontent = 1;
+
+        foreach ($properties as $property => $value) {
+            $moduleinfo->$property = $value;
+        }
+
+        return add_moduleinfo($moduleinfo, $course);
+    }
+
     public static function add_module_to_section(int $courseid, int $sectionnum, int $cmid, int $coursemodule_visible): void {
-        global $DB;
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
 
         $section = self::get_section_by_number($courseid, $sectionnum);
         if (!$section) {
-            return;
+            throw new \moodle_exception('sectionnotfound', 'local_activity_utils', '', $sectionnum);
         }
 
-        if (!empty($section->sequence)) {
-            $sequence = $section->sequence . ',' . $cmid;
-        } else {
-            $sequence = (string)$cmid;
-        }
-        $DB->set_field('course_sections', 'sequence', $sequence, ['id' => $section->id]);
+        course_add_cm_to_section($courseid, $cmid, $sectionnum);
 
         if (!empty($section->component) && $section->component === 'mod_subsection') {
             self::inherit_subsection_visibility($cmid, $section, $coursemodule_visible);
@@ -51,9 +86,7 @@ class helper {
 
         if ($subsection_cm) {
             $final_visibility = $requested_visibility && $subsection_cm->visible ? 1 : 0;
-            
-            $DB->set_field('course_modules', 'visible', $final_visibility, ['id' => $cmid]);
-            $DB->set_field('course_modules', 'visibleold', $final_visibility, ['id' => $cmid]);
+            set_coursemodule_visible($cmid, $final_visibility, 1, false);
         }
     }
 }

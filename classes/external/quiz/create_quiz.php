@@ -123,7 +123,6 @@ class create_quiz extends external_api {
 
         require_once($CFG->dirroot . '/course/lib.php');
         require_once($CFG->dirroot . '/mod/quiz/lib.php');
-        require_once($CFG->dirroot . '/lib/gradelib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'courseid' => $courseid,
@@ -204,107 +203,53 @@ class create_quiz extends external_api {
             $params['browsersecurity'] = '-';
         }
 
-        
-        $quiz = new \stdClass();
-        $quiz->course = $params['courseid'];
-        $quiz->name = $params['name'];
-        $quiz->intro = $params['intro'];
-        $quiz->introformat = FORMAT_HTML;
-        $quiz->timeopen = $params['timeopen'];
-        $quiz->timeclose = $params['timeclose'];
-        $quiz->timelimit = $params['timelimit'];
-        $quiz->overduehandling = $params['overduehandling'];
-        $quiz->graceperiod = $params['graceperiod'];
-        $quiz->preferredbehaviour = $params['preferredbehaviour'];
-        $quiz->canredoquestions = $params['canredoquestions'];
-        $quiz->attempts = $params['attempts'];
-        $quiz->attemptonlast = $params['attemptonlast'];
-        $quiz->grademethod = $params['grademethod'];
-        $quiz->decimalpoints = $params['decimalpoints'];
-        $quiz->questiondecimalpoints = $params['questiondecimalpoints'];
-        $quiz->reviewattempt = $params['reviewattempt'];
-        $quiz->reviewcorrectness = $params['reviewcorrectness'];
-        $quiz->reviewmarks = $params['reviewmarks'];
-        $quiz->reviewspecificfeedback = $params['reviewspecificfeedback'];
-        $quiz->reviewgeneralfeedback = $params['reviewgeneralfeedback'];
-        $quiz->reviewrightanswer = $params['reviewrightanswer'];
-        $quiz->reviewoverallfeedback = $params['reviewoverallfeedback'];
-        $quiz->reviewmaxmarks = $params['reviewmaxmarks'];
-        $quiz->questionsperpage = $params['questionsperpage'];
-        $quiz->navmethod = $params['navmethod'];
-        $quiz->shuffleanswers = $params['shuffleanswers'];
-        $quiz->sumgrades = 0;
-        $quiz->grade = $params['grade'];
-        $quiz->timecreated = time();
-        $quiz->timemodified = time();
-        $quiz->password = $params['password'];
-        $quiz->subnet = $params['subnet'];
-        $quiz->browsersecurity = $params['browsersecurity'];
-        $quiz->delay1 = $params['delay1'];
-        $quiz->delay2 = $params['delay2'];
-        $quiz->showuserpicture = $params['showuserpicture'];
-        $quiz->showblocks = $params['showblocks'];
-        $quiz->completionattemptsexhausted = $params['completionattemptsexhausted'];
-        $quiz->completionminattempts = $params['completionminattempts'];
-        $quiz->allowofflineattempts = $params['allowofflineattempts'];
-
-        
-        $quizid = $DB->insert_record('quiz', $quiz);
-
-        
-        $section = new \stdClass();
-        $section->quizid = $quizid;
-        $section->firstslot = 1;
-        $section->heading = '';
-        $section->shufflequestions = 0;
-        $DB->insert_record('quiz_sections', $section);
-
-        
-        $moduleid = $DB->get_field('modules', 'id', ['name' => 'quiz'], MUST_EXIST);
-
-        
-        $cm = new \stdClass();
-        $cm->course = $params['courseid'];
-        $cm->module = $moduleid;
-        $cm->instance = $quizid;
-        $cm->section = $params['section'];
-        $cm->idnumber = $params['idnumber'];
-        $cm->added = time();
-        $cm->score = 0;
-        $cm->indent = 0;
-        $cm->visible = $params['visible'];
-        $cm->visibleoncoursepage = 1;
-        $cm->visibleold = $params['visible'];
-        $cm->groupmode = 0;
-        $cm->groupingid = 0;
-        $cm->completion = 0;
-        $cm->completionview = 0;
-        $cm->completionexpected = 0;
-        $cm->completionpassgrade = 0;
-        $cm->showdescription = 0;
-        $cm->availability = null;
-        $cm->deletioninprogress = 0;
-        $cm->downloadcontent = 1;
-        $cm->lang = '';
-        $cm->completiongradeitemnumber = null;
-
-        $cmid = $DB->insert_record('course_modules', $cm);
-
-        
-        helper::add_module_to_section($params['courseid'], $params['section'], $cmid, $params['visible']);
-
-        
-        rebuild_course_cache($params['courseid'], true);
-
-        
-        $gradeitem = [
-            'itemname' => $params['name'],
-            'gradetype' => GRADE_TYPE_VALUE,
-            'grademax' => $params['grade'],
-            'grademin' => 0,
-            'idnumber' => $params['idnumber'],
+        $moduleproperties = [
+            'cmidnumber' => $params['idnumber'],
+            'intro' => $params['intro'],
+            'introformat' => FORMAT_HTML,
+            'timeopen' => $params['timeopen'],
+            'timeclose' => $params['timeclose'],
+            'timelimit' => $params['timelimit'],
+            'overduehandling' => $params['overduehandling'],
+            'graceperiod' => $params['graceperiod'],
+            'preferredbehaviour' => $params['preferredbehaviour'],
+            'canredoquestions' => $params['canredoquestions'],
+            'attempts' => $params['attempts'],
+            'attemptonlast' => $params['attemptonlast'],
+            'grademethod' => $params['grademethod'],
+            'decimalpoints' => $params['decimalpoints'],
+            'questiondecimalpoints' => $params['questiondecimalpoints'],
+            'questionsperpage' => $params['questionsperpage'],
+            'navmethod' => $params['navmethod'],
+            'shuffleanswers' => $params['shuffleanswers'],
+            'sumgrades' => 0,
+            'grade' => $params['grade'],
+            'quizpassword' => $params['password'],
+            'subnet' => $params['subnet'],
+            'browsersecurity' => $params['browsersecurity'],
+            'delay1' => $params['delay1'],
+            'delay2' => $params['delay2'],
+            'showuserpicture' => $params['showuserpicture'],
+            'showblocks' => $params['showblocks'],
+            'completionattemptsexhausted' => $params['completionattemptsexhausted'],
+            'completionminattempts' => $params['completionminattempts'],
+            'allowofflineattempts' => $params['allowofflineattempts'],
         ];
-        grade_update('mod/quiz', $params['courseid'], 'mod', 'quiz', $quizid, 0, null, $gradeitem);
+        self::add_review_options($moduleproperties, 'attempt', $params['reviewattempt']);
+        self::add_review_options($moduleproperties, 'correctness', $params['reviewcorrectness']);
+        self::add_review_options($moduleproperties, 'marks', $params['reviewmarks']);
+        self::add_review_options($moduleproperties, 'specificfeedback', $params['reviewspecificfeedback']);
+        self::add_review_options($moduleproperties, 'generalfeedback', $params['reviewgeneralfeedback']);
+        self::add_review_options($moduleproperties, 'rightanswer', $params['reviewrightanswer']);
+        self::add_review_options($moduleproperties, 'overallfeedback', $params['reviewoverallfeedback']);
+        self::add_review_options($moduleproperties, 'maxmarks', $params['reviewmaxmarks']);
+
+        $moduleinfo = helper::create_module($course, 'quiz', $params['section'], $params['name'], $params['visible'],
+            $moduleproperties);
+        $quizid = $moduleinfo->instance;
+        $cmid = $moduleinfo->coursemodule;
+
+        rebuild_course_cache($params['courseid'], true);
 
         return [
             'id' => $quizid,
@@ -323,5 +268,18 @@ class create_quiz extends external_api {
             'success' => new external_value(PARAM_BOOL, 'Success status'),
             'message' => new external_value(PARAM_TEXT, 'Response message'),
         ]);
+    }
+
+    private static function add_review_options(array &$properties, string $field, int $value): void {
+        $times = [
+            'during' => \mod_quiz\question\display_options::DURING,
+            'immediately' => \mod_quiz\question\display_options::IMMEDIATELY_AFTER,
+            'open' => \mod_quiz\question\display_options::LATER_WHILE_OPEN,
+            'closed' => \mod_quiz\question\display_options::AFTER_CLOSE,
+        ];
+
+        foreach ($times as $name => $bit) {
+            $properties[$field . $name] = ($value & $bit) ? 1 : 0;
+        }
     }
 }

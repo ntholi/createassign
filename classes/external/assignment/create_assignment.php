@@ -42,7 +42,6 @@ class create_assignment extends external_api {
 
         require_once($CFG->dirroot . '/course/lib.php');
         require_once($CFG->dirroot . '/mod/assign/lib.php');
-        require_once($CFG->dirroot . '/lib/gradelib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'courseid' => $courseid,
@@ -65,110 +64,46 @@ class create_assignment extends external_api {
         require_capability('local/activity_utils:createassignment', $context);
         require_capability('mod/assign:addinstance', $context);
 
-        $assign = new \stdClass();
-        $assign->course = $params['courseid'];
-        $assign->name = $params['name'];
-        $assign->intro = $params['intro'];
-        $assign->introformat = FORMAT_HTML;
-        $assign->alwaysshowdescription = 0;
-        $assign->submissiondrafts = 0;
-        $assign->sendnotifications = 0;
-        $assign->sendlatenotifications = 0;
-        $assign->sendstudentnotifications = 1;
-        $assign->duedate = $params['duedate'];
-        $assign->cutoffdate = 0;
-        $assign->gradingduedate = 0;
-        $assign->allowsubmissionsfromdate = 0;
-        $assign->grade = $params['grademax'];
-        $assign->timemodified = time();
-        $assign->timecreated = time();
-        $assign->teamsubmission = 0;
-        $assign->requireallteammemberssubmit = 0;
-        $assign->teamsubmissiongroupingid = 0;
-        $assign->blindmarking = 0;
-        $assign->hidegrader = 0;
-        $assign->revealidentities = 0;
-        $assign->attemptreopenmethod = 'none';
-        $assign->maxattempts = -1;
-        $assign->markingworkflow = 0;
-        $assign->markingallocation = 0;
-        $assign->requiresubmissionstatement = 0;
-        $assign->preventsubmissionnotingroup = 0;
-        $assign->activity = $params['activity'];
-        $assign->activityformat = FORMAT_HTML;
-        $assign->timelimit = 0;
-        $assign->submissionattachments = 0;
-        $assign->allowsubmissionsfromdate = $params['allowsubmissionsfromdate'];
-
-        $assignid = $DB->insert_record('assign', $assign);
-
-        $moduleid = $DB->get_field('modules', 'id', ['name' => 'assign'], MUST_EXIST);
-
-        $cm = new \stdClass();
-        $cm->course = $params['courseid'];
-        $cm->module = $moduleid;
-        $cm->instance = $assignid;
-        $cm->section = $params['section'];
-        $cm->idnumber = $params['idnumber'];
-        $cm->added = time();
-        $cm->score = 0;
-        $cm->indent = 0;
-        $cm->visible = $params['visible'];
-        $cm->visibleoncoursepage = 1;
-        $cm->visibleold = $params['visible'];
-        $cm->groupmode = 0;
-        $cm->groupingid = 0;
-        $cm->completion = 0;
-        $cm->completionview = 0;
-        $cm->completionexpected = 0;
-        $cm->completionpassgrade = 0;
-        $cm->showdescription = 0;
-        $cm->availability = null;
-        $cm->deletioninprogress = 0;
-        $cm->downloadcontent = 1;
-        $cm->lang = '';
-        $cm->completiongradeitemnumber = null;
-
-        $cmid = $DB->insert_record('course_modules', $cm);
-
-        
-        helper::add_module_to_section($params['courseid'], $params['section'], $cmid, $params['visible']);
-
-        rebuild_course_cache($params['courseid'], true);
-
-        grade_update('mod/assign', $params['courseid'], 'mod', 'assign', $assignid, 0, null, [
-            'itemname' => $params['name'],
-            'gradetype' => GRADE_TYPE_VALUE,
-            'grademax' => $params['grademax'],
-            'grademin' => 0
+        $transaction = $DB->start_delegated_transaction();
+        $moduleinfo = helper::create_module($course, 'assign', $params['section'], $params['name'], $params['visible'], [
+            'cmidnumber' => $params['idnumber'],
+            'intro' => $params['intro'],
+            'introformat' => FORMAT_HTML,
+            'alwaysshowdescription' => 0,
+            'submissiondrafts' => 0,
+            'sendnotifications' => 0,
+            'sendlatenotifications' => 0,
+            'sendstudentnotifications' => 1,
+            'duedate' => $params['duedate'],
+            'cutoffdate' => 0,
+            'gradingduedate' => 0,
+            'allowsubmissionsfromdate' => $params['allowsubmissionsfromdate'],
+            'grade' => $params['grademax'],
+            'teamsubmission' => 0,
+            'requireallteammemberssubmit' => 0,
+            'teamsubmissiongroupingid' => 0,
+            'blindmarking' => 0,
+            'hidegrader' => 0,
+            'attemptreopenmethod' => 'none',
+            'maxattempts' => -1,
+            'markingworkflow' => 0,
+            'markingallocation' => 0,
+            'requiresubmissionstatement' => 0,
+            'preventsubmissionnotingroup' => 0,
+            'activityeditor' => [
+                'text' => $params['activity'],
+                'format' => FORMAT_HTML,
+            ],
+            'timelimit' => 0,
+            'submissionattachments' => 0,
+            'completionsubmit' => 0,
+            'assignsubmission_file_enabled' => 1,
+            'assignsubmission_file_maxfiles' => 20,
+            'assignsubmission_file_maxsizebytes' => $CFG->maxbytes ?? 0,
+            'assignsubmission_file_filetypes' => '',
         ]);
-
-        
-        $pluginconfig = new \stdClass();
-        $pluginconfig->assignment = $assignid;
-        $pluginconfig->plugin = 'file';
-        $pluginconfig->subtype = 'assignsubmission';
-        $pluginconfig->name = 'enabled';
-        $pluginconfig->value = '1';
-        $DB->insert_record('assign_plugin_config', $pluginconfig);
-
-        
-        $pluginconfig = new \stdClass();
-        $pluginconfig->assignment = $assignid;
-        $pluginconfig->plugin = 'file';
-        $pluginconfig->subtype = 'assignsubmission';
-        $pluginconfig->name = 'maxfilesubmissions';
-        $pluginconfig->value = '20';
-        $DB->insert_record('assign_plugin_config', $pluginconfig);
-
-        
-        $pluginconfig = new \stdClass();
-        $pluginconfig->assignment = $assignid;
-        $pluginconfig->plugin = 'file';
-        $pluginconfig->subtype = 'assignsubmission';
-        $pluginconfig->name = 'maxsubmissionsizebytes';
-        $pluginconfig->value = $CFG->maxbytes ?? '0';
-        $DB->insert_record('assign_plugin_config', $pluginconfig);
+        $assignid = $moduleinfo->instance;
+        $cmid = $moduleinfo->coursemodule;
 
         if (!empty($params['introfiles']) && $params['introfiles'] !== '[]') {
             $files = json_decode($params['introfiles'], true);
@@ -219,6 +154,9 @@ class create_assignment extends external_api {
                 }
             }
         }
+
+        rebuild_course_cache($params['courseid'], true);
+        $transaction->allow_commit();
 
         return [
             'id' => $assignid,
