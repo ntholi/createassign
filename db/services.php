@@ -471,5 +471,46 @@ $functions = array(
         'ajax' => true,
         'capabilities' => 'local/activity_utils:viewquizattempts',
     ),
+
+    'local_activity_utils_provision_users' => array(
+        'classname' => 'local_activity_utils\external\provision\provision_users',
+        'methodname' => 'execute',
+        'description' => 'Create or switch Moodle Google-OAuth users and issue FiveDays tokens',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:provision',
+    ),
+    'local_activity_utils_ensure_course' => array(
+        'classname' => 'local_activity_utils\external\provision\ensure_course',
+        'methodname' => 'execute',
+        'description' => 'Reuse or create a Moodle course in a category named by school code',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:provision',
+    ),
+    'local_activity_utils_enrol_users' => array(
+        'classname' => 'local_activity_utils\external\provision\enrol_users',
+        'methodname' => 'execute',
+        'description' => 'Manually enrol users in a course as editingteacher or student',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:provision',
+    ),
+    'local_activity_utils_unenrol_users' => array(
+        'classname' => 'local_activity_utils\external\provision\unenrol_users',
+        'methodname' => 'execute',
+        'description' => 'Manually unenrol users from a course',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:provision',
+    ),
+    'local_activity_utils_ensure_google_login' => array(
+        'classname' => 'local_activity_utils\external\provision\ensure_google_login',
+        'methodname' => 'execute',
+        'description' => 'Enable Google OAuth login without auto-registration and keep the password form',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:provision',
+    ),
 );
 

@@ -54,3 +54,6 @@ $string['activity_utils:deletequestion'] = 'Delete questions via API';
 
 $string['activity_utils:viewquizattempts'] = 'View quiz attempts via API';
 $string['activity_utils:gradequizattempts'] = 'Grade quiz attempts via API';
+$string['activity_utils:provision'] = 'Provision Moodle users, courses, and enrolments via API';
+$string['googleissuermissing'] = 'Google OAuth issuer is not configured';
+$string['usernotfound'] = 'User with email {$a} was not found';
