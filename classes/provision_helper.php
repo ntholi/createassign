@@ -164,7 +164,7 @@ class provision_helper {
 
         $record = $DB->get_record('course_categories', ['name' => $categoryname], '*', IGNORE_MULTIPLE);
         if ($record) {
-            return \core_course_category::get((int) $record->id);
+            return \core_course_category::get((int) $record->id, MUST_EXIST, true);
         }
 
         return \core_course_category::create([
