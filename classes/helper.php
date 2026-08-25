@@ -89,4 +89,106 @@ class helper {
             set_coursemodule_visible($cmid, $final_visibility, 1, false);
         }
     }
+
+    public static function get_assign_for_comments(int $assignmentid): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+
+        $assign = $DB->get_record('assign', ['id' => $assignmentid], '*', MUST_EXIST);
+        $cm = get_coursemodule_from_instance('assign', $assign->id, 0, false, MUST_EXIST);
+        $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
+        $context = \context_module::instance($cm->id);
+        $assignment = new \assign($context, $cm, $course);
+
+        return [$assignment, $cm, $course, $context];
+    }
+
+    public static function enable_assignment_comments(\assign $assignment): void {
+        $plugin = $assignment->get_submission_plugin_by_type('comments');
+        if ($plugin && !$plugin->is_enabled()) {
+            $plugin->enable();
+        }
+    }
+
+    public static function assignment_comment_manager(
+        \assign $assignment,
+        \stdClass $cm,
+        \stdClass $course,
+        int $submissionid
+    ): \core_comment\manager {
+        $options = new \stdClass();
+        $options->context = $assignment->get_context();
+        $options->component = 'assignsubmission_comments';
+        $options->area = 'submission_comments';
+        $options->itemid = $submissionid;
+        $options->course = $course;
+        $options->cm = $cm;
+        return new \core_comment\manager($options);
+    }
+
+    public static function format_assignment_comment(\stdClass $comment, \stdClass $user): array {
+        return [
+            'id' => (int)$comment->id,
+            'content' => (string)$comment->content,
+            'userid' => (int)$comment->userid,
+            'author' => fullname($user),
+            'timecreated' => (int)$comment->timecreated,
+        ];
+    }
+
+    public static function list_assignment_comments(\assign $assignment, int $userid): array {
+        global $DB;
+
+        $submission = $assignment->get_user_submission($userid, false);
+        if (!$submission) {
+            return [];
+        }
+
+        $comments = $DB->get_records_select(
+            'comments',
+            'contextid = :contextid AND component = :component AND commentarea = :commentarea AND itemid = :itemid',
+            [
+                'contextid' => $assignment->get_context()->id,
+                'component' => 'assignsubmission_comments',
+                'commentarea' => 'submission_comments',
+                'itemid' => $submission->id,
+            ],
+            'timecreated ASC, id ASC'
+        );
+        if (!$comments) {
+            return [];
+        }
+
+        $userids = array_unique(array_map(static fn($comment) => (int)$comment->userid, $comments));
+        [$insql, $inparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'u');
+        $users = $DB->get_records_select('user', "id $insql", $inparams);
+
+        $out = [];
+        foreach ($comments as $comment) {
+            $user = $users[$comment->userid] ?? null;
+            if (!$user) {
+                continue;
+            }
+            $out[] = self::format_assignment_comment($comment, $user);
+        }
+        return $out;
+    }
+
+    public static function require_assignment_comment(int $commentid): array {
+        global $DB;
+
+        $comment = $DB->get_record('comments', ['id' => $commentid], '*', MUST_EXIST);
+        if (
+            $comment->component !== 'assignsubmission_comments'
+            || $comment->commentarea !== 'submission_comments'
+        ) {
+            throw new \moodle_exception('invalidcommentarea');
+        }
+
+        $submission = $DB->get_record('assign_submission', ['id' => $comment->itemid], '*', MUST_EXIST);
+        [$assignment, $cm, $course, $context] = self::get_assign_for_comments((int)$submission->assignment);
+
+        return [$comment, $submission, $assignment, $cm, $course, $context];
+    }
 }

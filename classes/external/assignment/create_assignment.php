@@ -106,6 +106,8 @@ class create_assignment extends external_api {
             'assignsubmission_file_maxfiles' => 20,
             'assignsubmission_file_maxsizebytes' => $CFG->maxbytes ?? 0,
             'assignsubmission_file_filetypes' => '',
+            'assignsubmission_comments_enabled' => 1,
+            'assignfeedback_comments_enabled' => 1,
         ]);
         $assignid = $moduleinfo->instance;
         $cmid = $moduleinfo->coursemodule;

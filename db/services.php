@@ -26,6 +26,38 @@ $functions = array(
         'ajax' => true,
         'capabilities' => 'local/activity_utils:updateassignment',
     ),
+    'local_activity_utils_get_assignment_comments' => array(
+        'classname' => 'local_activity_utils\external\assignment\get_assignment_comments',
+        'methodname' => 'execute',
+        'description' => 'List feedback comments for a student assignment submission',
+        'type' => 'read',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:viewassignmentcomments',
+    ),
+    'local_activity_utils_add_assignment_comment' => array(
+        'classname' => 'local_activity_utils\external\assignment\add_assignment_comment',
+        'methodname' => 'execute',
+        'description' => 'Add a feedback comment on a student assignment submission',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:manageassignmentcomments',
+    ),
+    'local_activity_utils_update_assignment_comment' => array(
+        'classname' => 'local_activity_utils\external\assignment\update_assignment_comment',
+        'methodname' => 'execute',
+        'description' => 'Update a feedback comment on a student assignment submission',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:manageassignmentcomments',
+    ),
+    'local_activity_utils_delete_assignment_comment' => array(
+        'classname' => 'local_activity_utils\external\assignment\delete_assignment_comment',
+        'methodname' => 'execute',
+        'description' => 'Delete a feedback comment on a student assignment submission',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:manageassignmentcomments',
+    ),
 
     'local_activity_utils_create_book' => array(
         'classname' => 'local_activity_utils\external\book\create_book',

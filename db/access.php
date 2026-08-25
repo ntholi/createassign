@@ -85,6 +85,26 @@ $capabilities = array(
             'manager' => CAP_ALLOW
         )
     ),
+    'local/activity_utils:viewassignmentcomments' => array(
+        'riskbitmask' => 0,
+        'captype' => 'read',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => array(
+            'teacher' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW
+        )
+    ),
+    'local/activity_utils:manageassignmentcomments' => array(
+        'riskbitmask' => RISK_SPAM | RISK_XSS,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => array(
+            'teacher' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW
+        )
+    ),
     'local/activity_utils:updatepage' => array(
         'riskbitmask' => RISK_SPAM | RISK_XSS,
         'captype' => 'write',
