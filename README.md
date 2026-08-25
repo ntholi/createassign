@@ -120,6 +120,7 @@ Parameters: `cmid` (course module ID)
 | `activity`                 | string | No       | Instructions (HTML) |
 | `allowsubmissionsfromdate` | int    | No       | Unix timestamp      |
 | `duedate`                  | int    | No       | Unix timestamp      |
+| `cutoffdate`               | int    | No       | Defaults to `duedate` (closes submissions) |
 | `section`                  | int    | No       | Default: 0          |
 | `idnumber`                 | string | No       | Gradebook ID        |
 | `grademax`                 | int    | No       | Default: 100        |
@@ -132,7 +133,7 @@ Parameters: `cmid` (course module ID)
 
 `local_activity_utils_update_assignment`
 
-Parameters: `assignmentid` (required), `name`, `intro`, `activity`, `allowsubmissionsfromdate`, `duedate`, `cutoffdate`, `idnumber`, `grademax`, `introfiles` (JSON array base64), `visible`
+Parameters: `assignmentid` (required), `name`, `intro`, `activity`, `allowsubmissionsfromdate`, `duedate`, `cutoffdate`, `idnumber`, `grademax`, `introfiles` (JSON array base64; when sent, replaces all intro attachments), `visible`
 
 ### Delete Assignment
 

@@ -101,7 +101,9 @@ class create_rubric extends external_api {
             $criteriondata = [
                 'description' => $criterion['description'],
                 'descriptionformat' => FORMAT_HTML,
-                'sortorder' => $criterion['sortorder'] ?: $sortorder,
+                'sortorder' => array_key_exists('sortorder', $criterion)
+                    ? (int) $criterion['sortorder']
+                    : $sortorder,
                 'levels' => [],
             ];
 

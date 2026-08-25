@@ -14,21 +14,29 @@ class ensure_course extends external_api {
             'fullname' => new external_value(PARAM_TEXT, 'Course full name'),
             'shortname' => new external_value(PARAM_TEXT, 'Course short name'),
             'categoryname' => new external_value(PARAM_TEXT, 'Category name (school code)'),
+            'idnumber' => new external_value(PARAM_TEXT, 'Registry termId:semesterModuleId'),
         ]);
     }
 
-    public static function execute(string $fullname, string $shortname, string $categoryname): array {
+    public static function execute(
+        string $fullname,
+        string $shortname,
+        string $categoryname,
+        string $idnumber
+    ): array {
         $params = self::validate_parameters(self::execute_parameters(), [
             'fullname' => $fullname,
             'shortname' => $shortname,
             'categoryname' => $categoryname,
+            'idnumber' => $idnumber,
         ]);
         provision_helper::require_system_capability();
 
         return provision_helper::ensure_course(
             $params['fullname'],
             $params['shortname'],
-            $params['categoryname']
+            $params['categoryname'],
+            $params['idnumber']
         );
     }
 

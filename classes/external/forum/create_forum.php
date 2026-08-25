@@ -59,7 +59,7 @@ class create_forum extends external_api {
             'assesstimefinish' => 0,
             'scale' => 0,
             'maxbytes' => 0,
-            'maxattachments' => 1,
+            'maxattachments' => 9,
             'forcesubscribe' => 0,
             'trackingtype' => 1,
             'rsstype' => 0,

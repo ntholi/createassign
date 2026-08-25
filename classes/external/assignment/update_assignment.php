@@ -20,7 +20,7 @@ class update_assignment extends external_api {
             'cutoffdate' => new external_value(PARAM_INT, 'Cut-off date timestamp', VALUE_DEFAULT, null),
             'idnumber' => new external_value(PARAM_RAW, 'ID number for gradebook and external system reference', VALUE_DEFAULT, null),
             'grademax' => new external_value(PARAM_INT, 'Maximum grade', VALUE_DEFAULT, null),
-            'introfiles' => new external_value(PARAM_RAW, 'Additional files as JSON array', VALUE_DEFAULT, null),
+            'introfiles' => new external_value(PARAM_RAW, 'Replacement files as JSON array (replaces all intro attachments)', VALUE_DEFAULT, null),
             'visible' => new external_value(PARAM_INT, 'Visibility (1=visible, 0=hidden)', VALUE_DEFAULT, null),
         ]);
     }
@@ -77,6 +77,7 @@ class update_assignment extends external_api {
         }
         if ($params['intro'] !== null) {
             $assign->intro = $params['intro'];
+            $assign->alwaysshowdescription = 1;
             $updated = true;
         }
         if ($params['activity'] !== null) {
@@ -133,52 +134,38 @@ class update_assignment extends external_api {
                 throw new \invalid_parameter_exception('Invalid introfiles JSON payload');
             }
 
-            if (!empty($files)) {
-                $fs = get_file_storage();
-                $modulecontext = \context_module::instance($cm->id);
+            $fs = get_file_storage();
+            $modulecontext = \context_module::instance($cm->id);
+            $fs->delete_area_files($modulecontext->id, 'mod_assign', 'introattachment', 0);
 
-                foreach ($files as $file) {
-                    if (empty($file['filename']) || !isset($file['content'])) {
-                        continue;
-                    }
-
-                    $filename = clean_param($file['filename'], PARAM_FILE);
-                    if (empty($filename)) {
-                        continue;
-                    }
-
-                    $filepath = '/';
-                    $existingfile = $fs->get_file(
-                        $modulecontext->id,
-                        'mod_assign',
-                        'introattachment',
-                        0,
-                        $filepath,
-                        $filename
-                    );
-                    if ($existingfile) {
-                        $existingfile->delete();
-                    }
-
-                    $filerecord = [
-                        'contextid' => $modulecontext->id,
-                        'component' => 'mod_assign',
-                        'filearea' => 'introattachment',
-                        'itemid' => 0,
-                        'filepath' => $filepath,
-                        'filename' => $filename,
-                        'userid' => $USER->id,
-                        'timecreated' => time(),
-                        'timemodified' => time(),
-                    ];
-
-                    $filecontent = base64_decode($file['content'], true);
-                    if ($filecontent === false) {
-                        $filecontent = $file['content'];
-                    }
-
-                    $fs->create_file_from_string($filerecord, $filecontent);
+            foreach ($files as $file) {
+                if (empty($file['filename']) || !isset($file['content'])) {
+                    continue;
                 }
+
+                $filename = clean_param($file['filename'], PARAM_FILE);
+                if (empty($filename)) {
+                    continue;
+                }
+
+                $filerecord = [
+                    'contextid' => $modulecontext->id,
+                    'component' => 'mod_assign',
+                    'filearea' => 'introattachment',
+                    'itemid' => 0,
+                    'filepath' => '/',
+                    'filename' => $filename,
+                    'userid' => $USER->id,
+                    'timecreated' => time(),
+                    'timemodified' => time(),
+                ];
+
+                $filecontent = base64_decode($file['content'], true);
+                if ($filecontent === false) {
+                    $filecontent = $file['content'];
+                }
+
+                $fs->create_file_from_string($filerecord, $filecontent);
             }
         }
 

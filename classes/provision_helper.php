@@ -162,7 +162,11 @@ class provision_helper {
     public static function ensure_category(string $categoryname): \core_course_category {
         global $DB;
 
-        $record = $DB->get_record('course_categories', ['name' => $categoryname], '*', IGNORE_MULTIPLE);
+        $record = $DB->get_record_sql(
+            'SELECT * FROM {course_categories} WHERE LOWER(name) = LOWER(?)',
+            [$categoryname],
+            IGNORE_MULTIPLE
+        );
         if ($record) {
             return \core_course_category::get((int) $record->id, MUST_EXIST, true);
         }
@@ -174,31 +178,150 @@ class provision_helper {
         ]);
     }
 
-    public static function ensure_course(string $fullname, string $shortname, string $categoryname): array {
+    public static function ensure_course(
+        string $fullname,
+        string $shortname,
+        string $categoryname,
+        string $idnumber
+    ): array {
         global $CFG, $DB;
 
         require_once($CFG->dirroot . '/course/lib.php');
 
-        $category = self::ensure_category($categoryname);
-        $existing = $DB->get_record('course', ['shortname' => $shortname]);
-        if ($existing) {
-            return [
-                'courseId' => (int) $existing->id,
-                'created' => 0,
-                'categoryId' => (int) $category->id,
-            ];
+        $fullname = trim($fullname);
+        $shortname = trim($shortname);
+        $categoryname = trim($categoryname);
+        $idnumber = trim($idnumber);
+
+        if ($fullname === '' || $shortname === '' || $categoryname === '') {
+            throw new \invalid_parameter_exception('Course fullname, shortname, and categoryname are required');
+        }
+        if (!preg_match('/^\d+:\d+$/', $idnumber)) {
+            throw new \invalid_parameter_exception('idnumber must be termId:semesterModuleId');
         }
 
-        $course = create_course((object) [
+        $category = self::ensure_category($categoryname);
+        $existing = self::find_reusable_course($shortname, $idnumber);
+        if ($existing) {
+            self::adopt_course_idnumber($existing, $idnumber);
+            return self::course_ensure_result($existing, 0, $category);
+        }
+
+        $createshortname = $shortname;
+        $clash = $DB->get_record('course', ['shortname' => $createshortname]);
+        if ($clash && (string) $clash->idnumber !== '' && (string) $clash->idnumber !== $idnumber) {
+            $createshortname = self::disambiguated_shortname($shortname, $idnumber);
+        }
+
+        try {
+            $course = self::create_ensured_course($fullname, $createshortname, $idnumber, (int) $category->id);
+            return self::course_ensure_result($course, 1, $category);
+        } catch (\moodle_exception $exception) {
+            if (!in_array($exception->errorcode, ['shortnametaken', 'courseidnumbertaken'], true)) {
+                throw $exception;
+            }
+
+            $existing = self::find_reusable_course($createshortname, $idnumber)
+                ?: self::find_reusable_course($shortname, $idnumber);
+            if ($existing) {
+                self::adopt_course_idnumber($existing, $idnumber);
+                return self::course_ensure_result($existing, 0, $category);
+            }
+
+            if ($exception->errorcode === 'shortnametaken' && $createshortname === $shortname) {
+                $createshortname = self::disambiguated_shortname($shortname, $idnumber);
+                try {
+                    $course = self::create_ensured_course(
+                        $fullname,
+                        $createshortname,
+                        $idnumber,
+                        (int) $category->id
+                    );
+                    return self::course_ensure_result($course, 1, $category);
+                } catch (\moodle_exception $retry) {
+                    if (!in_array($retry->errorcode, ['shortnametaken', 'courseidnumbertaken'], true)) {
+                        throw $retry;
+                    }
+                    $existing = self::find_reusable_course($createshortname, $idnumber);
+                    if ($existing) {
+                        self::adopt_course_idnumber($existing, $idnumber);
+                        return self::course_ensure_result($existing, 0, $category);
+                    }
+                    throw $retry;
+                }
+            }
+
+            throw $exception;
+        }
+    }
+
+    private static function create_ensured_course(
+        string $fullname,
+        string $shortname,
+        string $idnumber,
+        int $categoryid
+    ): \stdClass {
+        return create_course((object) [
             'fullname' => $fullname,
             'shortname' => $shortname,
-            'category' => $category->id,
+            'idnumber' => $idnumber,
+            'category' => $categoryid,
             'visible' => 1,
         ]);
+    }
 
+    private static function find_reusable_course(string $shortname, string $idnumber): ?\stdClass {
+        global $DB;
+
+        $byidnumber = $DB->get_record('course', ['idnumber' => $idnumber]);
+        if ($byidnumber) {
+            return $byidnumber;
+        }
+
+        $byshortname = $DB->get_record('course', ['shortname' => $shortname]);
+        if (!$byshortname) {
+            return null;
+        }
+
+        $existingidnumber = (string) $byshortname->idnumber;
+        if ($existingidnumber === '' || $existingidnumber === $idnumber) {
+            return $byshortname;
+        }
+
+        return null;
+    }
+
+    private static function adopt_course_idnumber(\stdClass $course, string $idnumber): void {
+        global $DB;
+
+        if ((string) $course->idnumber === $idnumber) {
+            return;
+        }
+        if ((string) $course->idnumber !== '') {
+            return;
+        }
+
+        $taken = $DB->get_record('course', ['idnumber' => $idnumber]);
+        if ($taken && (int) $taken->id !== (int) $course->id) {
+            return;
+        }
+
+        $DB->set_field('course', 'idnumber', $idnumber, ['id' => $course->id]);
+        $course->idnumber = $idnumber;
+    }
+
+    private static function disambiguated_shortname(string $shortname, string $idnumber): string {
+        return $shortname . '_' . str_replace(':', '-', $idnumber);
+    }
+
+    private static function course_ensure_result(
+        \stdClass $course,
+        int $created,
+        \core_course_category $category
+    ): array {
         return [
             'courseId' => (int) $course->id,
-            'created' => 1,
+            'created' => $created,
             'categoryId' => (int) $category->id,
         ];
     }
