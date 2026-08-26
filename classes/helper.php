@@ -212,15 +212,69 @@ class helper {
         return $out;
     }
 
-    public static function release_unpublished_grades(\assign $assignment): array {
-        $assignment = self::ensure_marking_workflow($assignment);
-        $released = 0;
+    public static function save_feedback_comment(\assign $assignment, int $userid, string $comment): void {
+        global $DB;
 
+        $plugin = $assignment->get_feedback_plugin_by_type('comments');
+        if (!$plugin) {
+            throw new \invalid_parameter_exception('Feedback comments are not available');
+        }
+        if (!$plugin->is_enabled()) {
+            $plugin->enable();
+        }
+
+        $grade = $assignment->get_user_grade($userid, false);
+        if (!$grade) {
+            throw new \invalid_parameter_exception('Student has no grade');
+        }
+
+        $existing = $DB->get_record('assignfeedback_comments', ['grade' => $grade->id]);
+        if ($existing) {
+            $existing->commenttext = $comment;
+            $existing->commentformat = FORMAT_HTML;
+            $DB->update_record('assignfeedback_comments', $existing);
+            return;
+        }
+
+        $record = new \stdClass();
+        $record->commenttext = $comment;
+        $record->commentformat = FORMAT_HTML;
+        $record->grade = $grade->id;
+        $record->assignment = $assignment->get_instance()->id;
+        $DB->insert_record('assignfeedback_comments', $record);
+    }
+
+    public static function release_unpublished_grades(
+        \assign $assignment,
+        array $userids,
+        array $commentsbyuser
+    ): array {
+        $assignment = self::ensure_marking_workflow($assignment);
+        $wanted = [];
+        foreach ($userids as $userid) {
+            $wanted[(int)$userid] = true;
+        }
+
+        $toRelease = [];
         foreach (self::list_assignment_grades($assignment) as $row) {
+            if (empty($wanted[$row['userid']])) {
+                continue;
+            }
             if (!self::is_unpublished_release_state($row['releasestate'])) {
                 continue;
             }
+            $toRelease[] = $row;
+        }
 
+        foreach ($toRelease as $row) {
+            $comment = trim((string)($commentsbyuser[$row['userid']] ?? ''));
+            if ($comment !== '') {
+                self::save_feedback_comment($assignment, $row['userid'], $comment);
+            }
+        }
+
+        $released = 0;
+        foreach ($toRelease as $row) {
             $flags = $assignment->get_user_flags($row['userid'], true);
             $flags->workflowstate = ASSIGN_MARKING_WORKFLOW_STATE_RELEASED;
             $assignment->update_user_flags($flags);

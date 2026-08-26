@@ -167,11 +167,13 @@ Saves or overrides the overall mark. Does not release it. Changing a released gr
 
 `local_activity_utils_release_assignment_grades`
 
-Releases unpublished grades (`notreleased` and `beingedited`) so those students can see them. Already released students are left alone.
+Releases unpublished grades (`notreleased` and `beingedited`) for the given user IDs so those students can see them. Already released or ungraded students in the list are skipped. Optional comments are written as Moodle feedback comments only when non-empty.
 
-| Parameter      | Type | Required |
-| -------------- | ---- | -------- |
-| `assignmentid` | int  | Yes      |
+| Parameter      | Type                         | Required |
+| -------------- | ---------------------------- | -------- |
+| `assignmentid` | int                          | Yes      |
+| `userids`      | int[]                        | Yes      |
+| `comments`     | `{ userid, comment }[]`      | No       |
 
 ---
 
