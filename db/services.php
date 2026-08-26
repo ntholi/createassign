@@ -58,6 +58,30 @@ $functions = array(
         'ajax' => true,
         'capabilities' => 'local/activity_utils:manageassignmentcomments',
     ),
+    'local_activity_utils_get_assignment_grades' => array(
+        'classname' => 'local_activity_utils\external\assignment\get_assignment_grades',
+        'methodname' => 'execute',
+        'description' => 'List assignment grades and release states for enrolled students',
+        'type' => 'read',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:gradeassignment',
+    ),
+    'local_activity_utils_save_assignment_grade' => array(
+        'classname' => 'local_activity_utils\external\assignment\save_assignment_grade',
+        'methodname' => 'execute',
+        'description' => 'Save or override an assignment overall mark without releasing it',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:gradeassignment',
+    ),
+    'local_activity_utils_release_assignment_grades' => array(
+        'classname' => 'local_activity_utils\external\assignment\release_assignment_grades',
+        'methodname' => 'execute',
+        'description' => 'Release unpublished assignment grades so those students can see them',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:gradeassignment',
+    ),
 
     'local_activity_utils_create_book' => array(
         'classname' => 'local_activity_utils\external\book\create_book',

@@ -23,6 +23,7 @@ $string['activity_utils:updatesubsection'] = 'Update subsections via API';
 $string['activity_utils:managerubric'] = 'Manage rubrics via API';
 $string['activity_utils:graderubric'] = 'Grade assignments using rubrics via API';
 $string['activity_utils:viewrubricfilling'] = 'View rubric grading details via API';
+$string['activity_utils:gradeassignment'] = 'Save and release assignment grades via API';
 $string['activity_utils:createbigbluebuttonbn'] = 'Create BigBlueButton activities via API';
 $string['activity_utils:updatebigbluebuttonbn'] = 'Update BigBlueButton activities via API';
 $string['activity_utils:createforum'] = 'Create forum activities via API';

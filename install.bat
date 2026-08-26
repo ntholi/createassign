@@ -119,6 +119,27 @@ if errorlevel 1 (
     exit /b 1
 )
 
+copy /y "%SCRIPT_DIR%classes\external\assignment\get_assignment_grades.php" "%DEST_PATH%\classes\external\assignment\get_assignment_grades.php" >nul
+if errorlevel 1 (
+    echo [ERROR] Failed to copy assignment\get_assignment_grades.php
+    pause
+    exit /b 1
+)
+
+copy /y "%SCRIPT_DIR%classes\external\assignment\save_assignment_grade.php" "%DEST_PATH%\classes\external\assignment\save_assignment_grade.php" >nul
+if errorlevel 1 (
+    echo [ERROR] Failed to copy assignment\save_assignment_grade.php
+    pause
+    exit /b 1
+)
+
+copy /y "%SCRIPT_DIR%classes\external\assignment\release_assignment_grades.php" "%DEST_PATH%\classes\external\assignment\release_assignment_grades.php" >nul
+if errorlevel 1 (
+    echo [ERROR] Failed to copy assignment\release_assignment_grades.php
+    pause
+    exit /b 1
+)
+
 :: Copy bigbluebuttonbn files
 copy /y "%SCRIPT_DIR%classes\external\bigbluebuttonbn\create_bigbluebuttonbn.php" "%DEST_PATH%\classes\external\bigbluebuttonbn\create_bigbluebuttonbn.php" >nul
 if errorlevel 1 (

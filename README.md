@@ -2,16 +2,16 @@
 
 REST API endpoints for programmatic Moodle course content management.
 
-**Version:** 5.1 | **Requirements:** Moodle 5.0+, gradingform_fivedays plugin | **Developed for:** Limkokwing University
+**Version:** 5.3 | **Requirements:** Moodle 5.0+, gradingform_fivedays plugin | **Developed for:** Limkokwing University
 
 > **Important Moodle 5.0 Change:** Question categories are now created in the course's system question bank (`mod_qbank`) using module context, not course context. This is handled automatically by the plugin.
 
 ## Features
 
-57 web service functions:
+60 web service functions:
 
 - **Sections** (6): create, update, delete sections and subsections
-- **Assignments** (3): create, update, delete
+- **Assignments** (6): create, update, delete, get grades, save grade, release grades
 - **Pages** (3): create, update, delete
 - **Files** (3): create, update, delete
 - **URLs** (3): create, update, delete
@@ -127,7 +127,7 @@ Parameters: `cmid` (course module ID)
 | `introfiles`               | string | No       | JSON array (base64) |
 | `visible`                  | int    | No       | Default: 1          |
 
-**Note:** By default, assignments use simple direct grading. Add a rubric using `create_rubric` to switch to FiveDays grading.
+**Note:** By default, assignments use simple direct grading and marking workflow (grades stay hidden until released). Add a rubric using `create_rubric` to switch to FiveDays grading.
 
 ### Update Assignment
 
@@ -140,6 +140,38 @@ Parameters: `assignmentid` (required), `name`, `intro`, `activity`, `allowsubmis
 `local_activity_utils_delete_assignment`
 
 Parameters: `cmid` (course module ID)
+
+### Get Assignment Grades
+
+`local_activity_utils_get_assignment_grades`
+
+| Parameter      | Type | Required |
+| -------------- | ---- | -------- |
+| `assignmentid` | int  | Yes      |
+
+Each grade includes `userid`, `grade` (`-1` if none), and `releasestate`: `notgraded`, `notreleased`, `released`, or `beingedited`.
+
+### Save Assignment Grade
+
+`local_activity_utils_save_assignment_grade`
+
+Saves or overrides the overall mark. Does not release it. Changing a released grade sets `beingedited` (hidden again).
+
+| Parameter      | Type  | Required |
+| -------------- | ----- | -------- |
+| `assignmentid` | int   | Yes      |
+| `userid`       | int   | Yes      |
+| `grade`        | float | Yes      |
+
+### Release Assignment Grades
+
+`local_activity_utils_release_assignment_grades`
+
+Releases unpublished grades (`notreleased` and `beingedited`) so those students can see them. Already released students are left alone.
+
+| Parameter      | Type | Required |
+| -------------- | ---- | -------- |
+| `assignmentid` | int  | Yes      |
 
 ---
 

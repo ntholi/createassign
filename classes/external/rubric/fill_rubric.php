@@ -35,7 +35,9 @@ class fill_rubric extends external_api {
         global $CFG, $DB, $USER;
 
         require_once($CFG->dirroot . '/grade/grading/lib.php');
+        require_once($CFG->dirroot . '/grade/grading/form/lib.php');
         require_once($CFG->dirroot . '/mod/assign/locallib.php');
+        require_once($CFG->dirroot . '/lib/gradelib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'cmid' => $cmid,
@@ -187,31 +189,23 @@ class fill_rubric extends external_api {
             }
         }
 
+        $DB->set_field('grading_instances', 'status', \gradingform_instance::INSTANCE_STATUS_ACTIVE, ['id' => $instanceid]);
         $DB->set_field('grading_instances', 'timemodified', time(), ['id' => $instanceid]);
 
+        $grademax = $assignment->get_instance()->grade;
+        $controller->set_grade_range(make_grades_menu($grademax), $grademax > 0);
+        $instance->get_fivedays_filling(true);
         $gradevalue = $instance->get_grade();
-
-        $grade->grade = $gradevalue;
-        $grade->grader = $USER->id;
-        $grade->timemodified = time();
-        $DB->update_record('assign_grades', $grade);
-
-        $assign = $DB->get_record('assign', ['id' => $cm->instance], '*', MUST_EXIST);
-        $gradeitem = \grade_item::fetch([
-            'itemtype' => 'mod',
-            'itemmodule' => 'assign',
-            'iteminstance' => $assign->id,
-            'courseid' => $cm->course,
-            'itemnumber' => 0,
-        ]);
-
-        if ($gradeitem) {
-            $gradeitem->update_final_grade($params['userid'], $gradevalue, 'gradingform', null, FORMAT_MOODLE, $USER->id);
-        }
+        $saved = \local_activity_utils\helper::save_assignment_grade(
+            $assignment,
+            $params['userid'],
+            (float)$gradevalue
+        );
 
         return [
             'instanceid' => $instanceid,
-            'grade' => (float)$gradevalue,
+            'grade' => $saved['grade'],
+            'releasestate' => $saved['releasestate'],
             'success' => true,
             'message' => 'FiveDays rubric filled and grade saved successfully',
         ];
@@ -221,6 +215,7 @@ class fill_rubric extends external_api {
         return new external_single_structure([
             'instanceid' => new external_value(PARAM_INT, 'Grading instance ID'),
             'grade' => new external_value(PARAM_FLOAT, 'Calculated grade from rubric'),
+            'releasestate' => new external_value(PARAM_ALPHA, 'notgraded, notreleased, released, or beingedited'),
             'success' => new external_value(PARAM_BOOL, 'Success status'),
             'message' => new external_value(PARAM_TEXT, 'Response message'),
         ]);

@@ -90,7 +90,7 @@ class helper {
         }
     }
 
-    public static function get_assign_for_comments(int $assignmentid): array {
+    public static function get_assign(int $assignmentid): array {
         global $CFG, $DB;
 
         require_once($CFG->dirroot . '/mod/assign/locallib.php');
@@ -102,6 +102,138 @@ class helper {
         $assignment = new \assign($context, $cm, $course);
 
         return [$assignment, $cm, $course, $context];
+    }
+
+    public static function get_assign_for_comments(int $assignmentid): array {
+        return self::get_assign($assignmentid);
+    }
+
+    public static function assignment_release_state(?float $grade, ?string $workflowstate): string {
+        if ($grade === null || $grade < 0) {
+            return 'notgraded';
+        }
+        if ($workflowstate === ASSIGN_MARKING_WORKFLOW_STATE_RELEASED) {
+            return 'released';
+        }
+        if ($workflowstate === ASSIGN_MARKING_WORKFLOW_STATE_INMARKING) {
+            return 'beingedited';
+        }
+        return 'notreleased';
+    }
+
+    public static function workflow_after_grade_change(?string $current): string {
+        if (
+            $current === ASSIGN_MARKING_WORKFLOW_STATE_RELEASED
+            || $current === ASSIGN_MARKING_WORKFLOW_STATE_INMARKING
+        ) {
+            return ASSIGN_MARKING_WORKFLOW_STATE_INMARKING;
+        }
+        return ASSIGN_MARKING_WORKFLOW_STATE_READYFORRELEASE;
+    }
+
+    public static function is_unpublished_release_state(string $state): bool {
+        return $state === 'notreleased' || $state === 'beingedited';
+    }
+
+    public static function format_assign_grade(\assign $assignment, float $grade): float {
+        $item = $assignment->get_grade_item();
+        $decimals = $item ? $item->get_decimals() : 2;
+        return round($grade, $decimals);
+    }
+
+    public static function ensure_marking_workflow(\assign $assignment): \assign {
+        global $DB;
+
+        $instance = $assignment->get_instance();
+        if ((int)$instance->markingworkflow === 1) {
+            return $assignment;
+        }
+
+        $DB->set_field('assign', 'markingworkflow', 1, ['id' => $instance->id]);
+        [$fresh] = self::get_assign((int)$instance->id);
+        return $fresh;
+    }
+
+    public static function save_assignment_grade(\assign $assignment, int $userid, float $gradevalue): array {
+        global $USER;
+
+        $assignment = self::ensure_marking_workflow($assignment);
+        $gradevalue = self::format_assign_grade($assignment, $gradevalue);
+
+        $flags = $assignment->get_user_flags($userid, true);
+        $current = !empty($flags->workflowstate) ? (string)$flags->workflowstate : null;
+        $next = self::workflow_after_grade_change($current);
+        $flags->workflowstate = $next;
+        $assignment->update_user_flags($flags);
+
+        $grade = $assignment->get_user_grade($userid, true);
+        $grade->grade = $gradevalue;
+        $grade->grader = $USER->id;
+        $assignment->update_grade($grade);
+
+        return [
+            'grade' => $gradevalue,
+            'releasestate' => self::assignment_release_state($gradevalue, $next),
+        ];
+    }
+
+    public static function list_assignment_grades(\assign $assignment): array {
+        global $DB;
+
+        $instance = $assignment->get_instance();
+        $rows = $DB->get_records_sql(
+            "SELECT g.userid, g.grade, f.workflowstate
+               FROM {assign_grades} g
+               JOIN {assign_submission} s
+                 ON s.assignment = g.assignment
+                AND s.userid = g.userid
+                AND s.latest = 1
+                AND s.attemptnumber = g.attemptnumber
+          LEFT JOIN {assign_user_flags} f
+                 ON f.assignment = g.assignment
+                AND f.userid = g.userid
+              WHERE g.assignment = :assignid",
+            ['assignid' => $instance->id]
+        );
+
+        $out = [];
+        foreach ($rows as $row) {
+            $grade = $row->grade === null || $row->grade === '' ? null : (float)$row->grade;
+            $state = self::assignment_release_state(
+                $grade,
+                !empty($row->workflowstate) ? (string)$row->workflowstate : null
+            );
+            $out[] = [
+                'userid' => (int)$row->userid,
+                'grade' => $grade !== null && $grade >= 0 ? $grade : -1,
+                'releasestate' => $state,
+            ];
+        }
+        return $out;
+    }
+
+    public static function release_unpublished_grades(\assign $assignment): array {
+        $assignment = self::ensure_marking_workflow($assignment);
+        $released = 0;
+
+        foreach (self::list_assignment_grades($assignment) as $row) {
+            if (!self::is_unpublished_release_state($row['releasestate'])) {
+                continue;
+            }
+
+            $flags = $assignment->get_user_flags($row['userid'], true);
+            $flags->workflowstate = ASSIGN_MARKING_WORKFLOW_STATE_RELEASED;
+            $assignment->update_user_flags($flags);
+
+            $grade = $assignment->get_user_grade($row['userid'], false);
+            if ($grade) {
+                $assignment->update_grade($grade);
+                $assignment->notify_grade_modified($grade, true);
+            }
+            $released++;
+        }
+
+        return ['released' => $released];
     }
 
     public static function enable_assignment_comments(\assign $assignment): void {

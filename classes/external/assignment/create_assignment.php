@@ -91,7 +91,7 @@ class create_assignment extends external_api {
             'hidegrader' => 0,
             'attemptreopenmethod' => 'none',
             'maxattempts' => -1,
-            'markingworkflow' => 0,
+            'markingworkflow' => 1,
             'markingallocation' => 0,
             'requiresubmissionstatement' => 0,
             'preventsubmissionnotingroup' => 0,
