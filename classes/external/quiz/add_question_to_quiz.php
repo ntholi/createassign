@@ -173,6 +173,8 @@ class add_question_to_quiz extends external_api {
                 'quizid' => $params['quizid'],
                 'slotnumber' => $newslot,
                 'page' => $page,
+                'questionbankentryid' => (int)$params['questionbankentryid'],
+                'version' => null,
             ],
         ]);
         $event->trigger();

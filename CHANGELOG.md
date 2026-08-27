@@ -1,5 +1,10 @@
 # Activity Utils changelog
 
+## 2026-08-26
+
+### Fixed
+- Quiz question removal now uses Moodle's `structure::remove_slot()` so the `slot_deleted` event includes `questionreferenceid`.
+
 ## 2026-05-28
 
 ### Fixed
