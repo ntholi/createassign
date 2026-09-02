@@ -8,6 +8,7 @@ use local_activity_utils\external\provision\enrol_users;
 use local_activity_utils\external\provision\ensure_course;
 use local_activity_utils\external\provision\ensure_google_login;
 use local_activity_utils\external\provision\provision_users;
+use local_activity_utils\external\provision\rebind_user_email;
 use local_activity_utils\external\provision\unenrol_users;
 
 class provision_test extends advanced_testcase {
@@ -112,5 +113,277 @@ class provision_test extends advanced_testcase {
             ],
         ]);
         $this->assertSame(0, $noop['unenrolled']);
+    }
+
+    public function test_rebind_keeps_user_id_and_enrolment(): void {
+        global $DB;
+
+        ensure_google_login::execute('test-client-id', 'test-client-secret');
+        $course = ensure_course::execute('Programming I', '2026-01_CS101_BSCSMY1S1', 'FICT', '12:34');
+        $fromemail = 'old.primary@example.com';
+        $toemail = 'new.primary@example.com';
+        $provisioned = provision_users::execute([
+            [
+                'email' => $fromemail,
+                'firstname' => 'Ada',
+                'lastname' => 'Lovelace',
+            ],
+        ]);
+        $fromid = (int) $provisioned['users'][0]['moodleUserId'];
+        enrol_users::execute([
+            [
+                'email' => $fromemail,
+                'courseid' => $course['courseId'],
+                'roleshortname' => 'student',
+            ],
+        ]);
+
+        $result = rebind_user_email::execute($fromemail, $toemail);
+
+        $this->assertSame($fromid, $result['moodleUserId']);
+        $this->assertSame($toemail, $result['email']);
+        $this->assertNotEmpty($result['token']);
+        $user = $DB->get_record('user', ['id' => $fromid], '*', MUST_EXIST);
+        $this->assertSame($toemail, $user->email);
+        $this->assertSame('new.primary.example.com', $user->username);
+        $this->assertSame('oauth2', $user->auth);
+        $this->assertTrue($DB->record_exists('user_enrolments', ['userid' => $fromid]));
+        $this->assertTrue($this->has_linked_login($fromid, $toemail));
+        $this->assertFalse($this->has_linked_login($fromid, $fromemail));
+        $this->assertNull(\local_activity_utils\provision_helper::find_user_by_email($fromemail));
+    }
+
+    public function test_rebind_retry_with_original_emails_succeeds(): void {
+        ensure_google_login::execute('test-client-id', 'test-client-secret');
+        $fromemail = 'retry.from@example.com';
+        $toemail = 'retry.to@example.com';
+        $provisioned = provision_users::execute([
+            [
+                'email' => $fromemail,
+                'firstname' => 'Ada',
+                'lastname' => 'Lovelace',
+            ],
+        ]);
+        $fromid = (int) $provisioned['users'][0]['moodleUserId'];
+
+        $first = rebind_user_email::execute($fromemail, $toemail);
+        $this->assertSame($fromid, $first['moodleUserId']);
+
+        $retry = rebind_user_email::execute($fromemail, $toemail);
+        $this->assertSame($fromid, $retry['moodleUserId']);
+        $this->assertSame($toemail, $retry['email']);
+        $this->assertNotEmpty($retry['token']);
+    }
+
+    public function test_rebind_fails_when_both_users_are_enrolled(): void {
+        global $DB;
+
+        ensure_google_login::execute('test-client-id', 'test-client-secret');
+        $course = ensure_course::execute('Programming I', '2026-01_CS101_BSCSMY1S1', 'FICT', '12:34');
+        $fromemail = 'both.from@example.com';
+        $toemail = 'both.to@example.com';
+        $provisioned = provision_users::execute([
+            [
+                'email' => $fromemail,
+                'firstname' => 'Ada',
+                'lastname' => 'Lovelace',
+            ],
+            [
+                'email' => $toemail,
+                'firstname' => 'Alan',
+                'lastname' => 'Turing',
+            ],
+        ]);
+        $fromid = (int) $provisioned['users'][0]['moodleUserId'];
+        $toid = (int) $provisioned['users'][1]['moodleUserId'];
+        enrol_users::execute([
+            [
+                'email' => $fromemail,
+                'courseid' => $course['courseId'],
+                'roleshortname' => 'student',
+            ],
+            [
+                'email' => $toemail,
+                'courseid' => $course['courseId'],
+                'roleshortname' => 'student',
+            ],
+        ]);
+        $frombefore = $DB->get_record('user', ['id' => $fromid], '*', MUST_EXIST);
+        $tobefore = $DB->get_record('user', ['id' => $toid], '*', MUST_EXIST);
+
+        try {
+            rebind_user_email::execute($fromemail, $toemail);
+            $this->fail('Expected emailhasmoodlework');
+        } catch (\moodle_exception $exception) {
+            $this->assertSame('emailhasmoodlework', $exception->errorcode);
+        }
+
+        $fromafter = $DB->get_record('user', ['id' => $fromid], '*', MUST_EXIST);
+        $toafter = $DB->get_record('user', ['id' => $toid], '*', MUST_EXIST);
+        $this->assertSame($frombefore->email, $fromafter->email);
+        $this->assertSame($frombefore->username, $fromafter->username);
+        $this->assertEquals(0, $fromafter->deleted);
+        $this->assertSame($tobefore->email, $toafter->email);
+        $this->assertSame($tobefore->username, $toafter->username);
+        $this->assertEquals(0, $toafter->deleted);
+        $this->assertTrue($DB->record_exists('user_enrolments', ['userid' => $fromid]));
+        $this->assertTrue($DB->record_exists('user_enrolments', ['userid' => $toid]));
+    }
+
+    public function test_rebind_deletes_unenrolled_from_user_when_target_is_enrolled(): void {
+        global $DB;
+
+        ensure_google_login::execute('test-client-id', 'test-client-secret');
+        $course = ensure_course::execute('Programming I', '2026-01_CS101_BSCSMY1S1', 'FICT', '12:34');
+        $fromemail = 'empty.from@example.com';
+        $toemail = 'enrolled.to@example.com';
+        $provisioned = provision_users::execute([
+            [
+                'email' => $fromemail,
+                'firstname' => 'Ada',
+                'lastname' => 'Lovelace',
+            ],
+            [
+                'email' => $toemail,
+                'firstname' => 'Alan',
+                'lastname' => 'Turing',
+            ],
+        ]);
+        $fromid = (int) $provisioned['users'][0]['moodleUserId'];
+        $toid = (int) $provisioned['users'][1]['moodleUserId'];
+        enrol_users::execute([
+            [
+                'email' => $toemail,
+                'courseid' => $course['courseId'],
+                'roleshortname' => 'student',
+            ],
+        ]);
+
+        $result = rebind_user_email::execute($fromemail, $toemail);
+
+        $this->assertSame($toid, $result['moodleUserId']);
+        $this->assertSame($toemail, $result['email']);
+        $this->assertEquals(1, $DB->get_field('user', 'deleted', ['id' => $fromid]));
+        $this->assertEquals(0, $DB->get_field('user', 'deleted', ['id' => $toid]));
+        $this->assertNull(\local_activity_utils\provision_helper::find_user_by_email($fromemail));
+    }
+
+    public function test_rebind_deletes_unenrolled_target_and_keeps_from_user(): void {
+        global $DB;
+
+        ensure_google_login::execute('test-client-id', 'test-client-secret');
+        $course = ensure_course::execute('Programming I', '2026-01_CS101_BSCSMY1S1', 'FICT', '12:34');
+        $fromemail = 'canonical.from@example.com';
+        $toemail = 'stray.to@example.com';
+        $provisioned = provision_users::execute([
+            [
+                'email' => $fromemail,
+                'firstname' => 'Ada',
+                'lastname' => 'Lovelace',
+            ],
+            [
+                'email' => $toemail,
+                'firstname' => 'Alan',
+                'lastname' => 'Turing',
+            ],
+        ]);
+        $fromid = (int) $provisioned['users'][0]['moodleUserId'];
+        $toid = (int) $provisioned['users'][1]['moodleUserId'];
+        enrol_users::execute([
+            [
+                'email' => $fromemail,
+                'courseid' => $course['courseId'],
+                'roleshortname' => 'student',
+            ],
+        ]);
+
+        $result = rebind_user_email::execute($fromemail, $toemail);
+
+        $this->assertSame($fromid, $result['moodleUserId']);
+        $this->assertSame($toemail, $result['email']);
+        $this->assertEquals(1, $DB->get_field('user', 'deleted', ['id' => $toid]));
+        $user = $DB->get_record('user', ['id' => $fromid], '*', MUST_EXIST);
+        $this->assertEquals(0, $user->deleted);
+        $this->assertSame($toemail, $user->email);
+        $this->assertSame('stray.to.example.com', $user->username);
+        $this->assertTrue($DB->record_exists('user_enrolments', ['userid' => $fromid]));
+        $this->assertTrue($this->has_linked_login($fromid, $toemail));
+    }
+
+    public function test_rebind_missing_emails_throws_usernotfound(): void {
+        ensure_google_login::execute('test-client-id', 'test-client-secret');
+
+        try {
+            rebind_user_email::execute('missing.from@example.com', 'missing.to@example.com');
+            $this->fail('Expected usernotfound');
+        } catch (\moodle_exception $exception) {
+            $this->assertSame('usernotfound', $exception->errorcode);
+        }
+    }
+
+    public function test_rebind_finds_mixed_case_stored_email(): void {
+        global $DB;
+
+        ensure_google_login::execute('test-client-id', 'test-client-secret');
+        $fromemail = 'mixed.case@example.com';
+        $toemail = 'mixed.to@example.com';
+        $provisioned = provision_users::execute([
+            [
+                'email' => $fromemail,
+                'firstname' => 'Ada',
+                'lastname' => 'Lovelace',
+            ],
+        ]);
+        $fromid = (int) $provisioned['users'][0]['moodleUserId'];
+        $DB->set_field('user', 'email', 'Mixed.Case@example.com', ['id' => $fromid]);
+
+        $result = rebind_user_email::execute($fromemail, $toemail);
+
+        $this->assertSame($fromid, $result['moodleUserId']);
+        $this->assertSame($toemail, $DB->get_field('user', 'email', ['id' => $fromid]));
+    }
+
+    public function test_rebind_throws_when_target_username_is_taken(): void {
+        global $DB;
+
+        ensure_google_login::execute('test-client-id', 'test-client-secret');
+        $fromemail = 'clash.from@example.com';
+        $toemail = 'clash.to@example.com';
+        $provisioned = provision_users::execute([
+            [
+                'email' => $fromemail,
+                'firstname' => 'Ada',
+                'lastname' => 'Lovelace',
+            ],
+        ]);
+        $fromid = (int) $provisioned['users'][0]['moodleUserId'];
+        $frombefore = $DB->get_record('user', ['id' => $fromid], '*', MUST_EXIST);
+        $this->getDataGenerator()->create_user([
+            'username' => 'clash.to.example.com',
+            'email' => 'clash.other@example.com',
+        ]);
+
+        try {
+            rebind_user_email::execute($fromemail, $toemail);
+            $this->fail('Expected invalid_parameter_exception');
+        } catch (\invalid_parameter_exception $exception) {
+            $this->assertSame('invalidparameter', $exception->errorcode);
+        }
+
+        $fromafter = $DB->get_record('user', ['id' => $fromid], '*', MUST_EXIST);
+        $this->assertSame($frombefore->email, $fromafter->email);
+        $this->assertSame($frombefore->username, $fromafter->username);
+        $this->assertEquals(0, $fromafter->deleted);
+        $this->assertTrue($this->has_linked_login($fromid, $fromemail));
+    }
+
+    private function has_linked_login(int $userid, string $email): bool {
+        global $DB;
+
+        return $DB->record_exists_select(
+            'auth_oauth2_linked_login',
+            'userid = ? AND LOWER(username) = LOWER(?)',
+            [$userid, $email]
+        );
     }
 }

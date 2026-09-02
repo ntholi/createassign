@@ -46,7 +46,6 @@ class provision_helper {
     public static function ensure_rest_service(): \stdClass {
         global $CFG, $DB;
 
-        require_once($CFG->libdir . '/externallib.php');
         require_once($CFG->dirroot . '/webservice/lib.php');
 
         set_config('enablewebservices', 1);
@@ -96,9 +95,7 @@ class provision_helper {
     }
 
     public static function ensure_token(\stdClass $service, int $userid): string {
-        global $CFG, $DB;
-
-        require_once($CFG->libdir . '/externallib.php');
+        global $DB;
 
         $existing = $DB->get_record('external_tokens', [
             'userid' => $userid,
@@ -108,7 +105,7 @@ class provision_helper {
         if ($existing) {
             return $existing->token;
         }
-        return external_generate_token(
+        return \core_external\util::generate_token(
             EXTERNAL_TOKEN_PERMANENT,
             $service,
             $userid,
@@ -328,8 +325,115 @@ class provision_helper {
 
     public static function find_user_by_email(string $email): ?\stdClass {
         global $DB;
-        $user = $DB->get_record('user', ['email' => $email, 'deleted' => 0]);
+
+        $email = strtolower(trim($email));
+        $user = $DB->get_record_sql(
+            'SELECT * FROM {user} WHERE LOWER(email) = ? AND deleted = 0',
+            [$email],
+            IGNORE_MULTIPLE
+        );
         return $user ?: null;
+    }
+
+    public static function has_enrolments(int $userid): bool {
+        global $DB;
+
+        return $DB->record_exists('user_enrolments', ['userid' => $userid]);
+    }
+
+    public static function rebind_oauth_user_email(
+        string $fromemail,
+        string $toemail,
+        \core\oauth2\issuer $issuer
+    ): \stdClass {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/user/lib.php');
+
+        $fromemail = strtolower(trim($fromemail));
+        $toemail = strtolower(trim($toemail));
+        $from = self::find_user_by_email($fromemail);
+        $to = self::find_user_by_email($toemail);
+
+        if ($fromemail === $toemail) {
+            $user = $from ?: $to;
+            if (!$user) {
+                throw new \moodle_exception('usernotfound', 'local_activity_utils', '', $fromemail);
+            }
+            self::link_oauth_login($user, $fromemail, $issuer);
+            return $user;
+        }
+
+        if ($from && $to && (int) $from->id === (int) $to->id) {
+            self::link_oauth_login($to, $toemail, $issuer);
+            return $to;
+        }
+
+        if ($from && $to && (int) $from->id !== (int) $to->id) {
+            $fromenrolled = self::has_enrolments((int) $from->id);
+            $toenrolled = self::has_enrolments((int) $to->id);
+            if ($fromenrolled && $toenrolled) {
+                throw new \moodle_exception('emailhasmoodlework', 'local_activity_utils');
+            }
+            if ($toenrolled && !$fromenrolled) {
+                self::unlink_oauth_login((int) $from->id, $fromemail);
+                delete_user($from);
+                self::link_oauth_login($to, $toemail, $issuer);
+                return $to;
+            }
+            self::unlink_oauth_login((int) $to->id, $toemail);
+            delete_user($to);
+            $to = null;
+        }
+
+        if (!$from && $to) {
+            self::link_oauth_login($to, $toemail, $issuer);
+            return $to;
+        }
+
+        if ($from && !$to) {
+            $username = strtolower(str_replace('@', '.', $toemail));
+            $clash = $DB->get_record('user', ['username' => $username, 'deleted' => 0]);
+            if ($clash && (int) $clash->id !== (int) $from->id) {
+                throw new \invalid_parameter_exception('Username is already in use');
+            }
+
+            self::unlink_oauth_login((int) $from->id, $fromemail);
+            $from->email = $toemail;
+            $from->username = $username;
+            user_update_user($from, false, false);
+            self::link_oauth_login($from, $toemail, $issuer);
+            return $from;
+        }
+
+        throw new \moodle_exception('usernotfound', 'local_activity_utils', '', $fromemail);
+    }
+
+    private static function unlink_oauth_login(int $userid, string $email): void {
+        global $DB;
+
+        $DB->delete_records_select(
+            'auth_oauth2_linked_login',
+            'userid = ? AND LOWER(username) = LOWER(?)',
+            [$userid, $email]
+        );
+    }
+
+    private static function link_oauth_login(
+        \stdClass $user,
+        string $email,
+        \core\oauth2\issuer $issuer
+    ): void {
+        try {
+            \auth_oauth2\api::link_login([
+                'username' => $email,
+                'email' => $email,
+            ], $issuer, $user->id, true);
+        } catch (\moodle_exception $exception) {
+            if ($exception->errorcode !== 'alreadylinked') {
+                throw $exception;
+            }
+        }
     }
 
     public static function ensure_manual_instance(\stdClass $course): \stdClass {

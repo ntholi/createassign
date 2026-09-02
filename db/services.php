@@ -536,6 +536,14 @@ $functions = array(
         'ajax' => true,
         'capabilities' => 'local/activity_utils:provision',
     ),
+    'local_activity_utils_rebind_user_email' => array(
+        'classname' => 'local_activity_utils\external\provision\rebind_user_email',
+        'methodname' => 'execute',
+        'description' => 'Rebind a Moodle Google-OAuth user to a new email and issue a FiveDays token',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'local/activity_utils:provision',
+    ),
     'local_activity_utils_ensure_course' => array(
         'classname' => 'local_activity_utils\external\provision\ensure_course',
         'methodname' => 'execute',
