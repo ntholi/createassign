@@ -17,6 +17,7 @@ class update_file extends external_api {
             'filename' => new external_value(PARAM_TEXT, 'New file name (requires filecontent)', VALUE_DEFAULT, null),
             'filecontent' => new external_value(PARAM_RAW, 'New file content (base64 encoded)', VALUE_DEFAULT, null),
             'visible' => new external_value(PARAM_INT, 'Visibility (1=visible, 0=hidden)', VALUE_DEFAULT, null),
+            'draftitemid' => new external_value(PARAM_INT, 'Draft item id from webservice/upload.php', VALUE_DEFAULT, null),
         ]);
     }
 
@@ -26,12 +27,14 @@ class update_file extends external_api {
         ?string $intro = null,
         ?string $filename = null,
         ?string $filecontent = null,
-        ?int $visible = null
+        ?int $visible = null,
+        ?int $draftitemid = null
     ): array {
         global $CFG, $DB, $USER;
 
         require_once($CFG->dirroot . '/course/lib.php');
         require_once($CFG->dirroot . '/mod/resource/lib.php');
+        require_once($CFG->dirroot . '/mod/resource/locallib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'resourceid' => $resourceid,
@@ -40,6 +43,7 @@ class update_file extends external_api {
             'filename' => $filename,
             'filecontent' => $filecontent,
             'visible' => $visible,
+            'draftitemid' => $draftitemid,
         ]);
 
         
@@ -66,7 +70,24 @@ class update_file extends external_api {
 
         
         $currentfilename = null;
-        if ($params['filecontent'] !== null) {
+        if (!empty($params['draftitemid'])) {
+            $data = (object) [
+                'files' => $params['draftitemid'],
+                'coursemodule' => $cm->id,
+                'display' => $resource->display,
+            ];
+            resource_set_mainfile($data);
+            $resource->revision = $resource->revision + 1;
+            $updated = true;
+
+            $modulecontext = \context_module::instance($cm->id);
+            $fs = get_file_storage();
+            $files = $fs->get_area_files($modulecontext->id, 'mod_resource', 'content', 0, 'sortorder', false);
+            foreach ($files as $file) {
+                $currentfilename = $file->get_filename();
+                break;
+            }
+        } else if ($params['filecontent'] !== null) {
             $modulecontext = \context_module::instance($cm->id);
             $fs = get_file_storage();
 

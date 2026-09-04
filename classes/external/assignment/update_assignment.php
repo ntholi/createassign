@@ -22,6 +22,7 @@ class update_assignment extends external_api {
             'grademax' => new external_value(PARAM_INT, 'Maximum grade', VALUE_DEFAULT, null),
             'introfiles' => new external_value(PARAM_RAW, 'Replacement files as JSON array (replaces all intro attachments)', VALUE_DEFAULT, null),
             'visible' => new external_value(PARAM_INT, 'Visibility (1=visible, 0=hidden)', VALUE_DEFAULT, null),
+            'introattachments' => new external_value(PARAM_INT, 'Draft item id for intro attachments (replaces the area)', VALUE_DEFAULT, null),
         ]);
     }
 
@@ -36,12 +37,15 @@ class update_assignment extends external_api {
         ?string $idnumber = null,
         ?int $grademax = null,
         ?string $introfiles = null,
-        ?int $visible = null
+        ?int $visible = null,
+        ?int $introattachments = null
     ): array {
         global $CFG, $DB, $USER;
 
         require_once($CFG->dirroot . '/course/lib.php');
         require_once($CFG->dirroot . '/mod/assign/lib.php');
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+        require_once($CFG->libdir . '/filelib.php');
         require_once($CFG->dirroot . '/lib/gradelib.php');
 
         $params = self::validate_parameters(self::execute_parameters(), [
@@ -56,6 +60,7 @@ class update_assignment extends external_api {
             'grademax' => $grademax,
             'introfiles' => $introfiles,
             'visible' => $visible,
+            'introattachments' => $introattachments,
         ]);
 
         
@@ -128,7 +133,16 @@ class update_assignment extends external_api {
             ]);
         }
 
-        if ($params['introfiles'] !== null && $params['introfiles'] !== '') {
+        if ($params['introattachments'] !== null) {
+            $modulecontext = \context_module::instance($cm->id);
+            file_save_draft_area_files(
+                (int) $params['introattachments'],
+                $modulecontext->id,
+                'mod_assign',
+                ASSIGN_INTROATTACHMENT_FILEAREA,
+                0
+            );
+        } else if ($params['introfiles'] !== null && $params['introfiles'] !== '') {
             $files = json_decode($params['introfiles'], true);
             if (json_last_error() !== JSON_ERROR_NONE || !is_array($files)) {
                 throw new \invalid_parameter_exception('Invalid introfiles JSON payload');

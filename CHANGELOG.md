@@ -1,5 +1,11 @@
 # Activity Utils changelog
 
+## 2026-09-04
+
+### Added
+- `create_file` / `update_file` accept an optional `draftitemid` from `webservice/upload.php` and save it through Moodle's resource draft area.
+- `create_assignment` / `update_assignment` accept an optional `introattachments` draft item id. Update replaces the intro attachment area when that id is set.
+
 ## 2026-08-26
 
 ### Fixed

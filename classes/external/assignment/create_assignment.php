@@ -23,6 +23,7 @@ class create_assignment extends external_api {
             'introfiles' => new external_value(PARAM_RAW, 'Additional files as JSON array', VALUE_DEFAULT, '[]'),
             'visible' => new external_value(PARAM_INT, 'Module visibility (1=visible, 0=hidden)', VALUE_DEFAULT, 1),
             'cutoffdate' => new external_value(PARAM_INT, 'Cut-off date timestamp (defaults to due date)', VALUE_DEFAULT, 0),
+            'introattachments' => new external_value(PARAM_INT, 'Draft item id for intro attachments', VALUE_DEFAULT, 0),
         ]);
     }
 
@@ -38,7 +39,8 @@ class create_assignment extends external_api {
         int $grademax = 100,
         string $introfiles = '[]',
         int $visible = 1,
-        int $cutoffdate = 0
+        int $cutoffdate = 0,
+        int $introattachments = 0
     ): array {
         global $CFG, $DB, $USER;
 
@@ -58,6 +60,7 @@ class create_assignment extends external_api {
             'introfiles' => $introfiles,
             'visible' => $visible,
             'cutoffdate' => $cutoffdate,
+            'introattachments' => $introattachments,
         ]);
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
@@ -68,7 +71,7 @@ class create_assignment extends external_api {
         require_capability('mod/assign:addinstance', $context);
 
         $transaction = $DB->start_delegated_transaction();
-        $moduleinfo = helper::create_module($course, 'assign', $params['section'], $params['name'], $params['visible'], [
+        $properties = [
             'cmidnumber' => $params['idnumber'],
             'intro' => $params['intro'],
             'introformat' => FORMAT_HTML,
@@ -108,11 +111,15 @@ class create_assignment extends external_api {
             'assignsubmission_file_filetypes' => '',
             'assignsubmission_comments_enabled' => 1,
             'assignfeedback_comments_enabled' => 1,
-        ]);
+        ];
+        if (!empty($params['introattachments'])) {
+            $properties['introattachments'] = $params['introattachments'];
+        }
+        $moduleinfo = helper::create_module($course, 'assign', $params['section'], $params['name'], $params['visible'], $properties);
         $assignid = $moduleinfo->instance;
         $cmid = $moduleinfo->coursemodule;
 
-        if (!empty($params['introfiles']) && $params['introfiles'] !== '[]') {
+        if (empty($params['introattachments']) && !empty($params['introfiles']) && $params['introfiles'] !== '[]') {
             $files = json_decode($params['introfiles'], true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($files) && !empty($files)) {
                 $fs = get_file_storage();
