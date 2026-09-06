@@ -24,6 +24,7 @@ class create_assignment extends external_api {
             'visible' => new external_value(PARAM_INT, 'Module visibility (1=visible, 0=hidden)', VALUE_DEFAULT, 1),
             'cutoffdate' => new external_value(PARAM_INT, 'Cut-off date timestamp (defaults to due date)', VALUE_DEFAULT, 0),
             'introattachments' => new external_value(PARAM_INT, 'Draft item id for intro attachments', VALUE_DEFAULT, 0),
+            'onlinetext' => new external_value(PARAM_INT, 'Online text submissions instead of file submissions (1=yes, 0=no)', VALUE_DEFAULT, 0),
         ]);
     }
 
@@ -40,7 +41,8 @@ class create_assignment extends external_api {
         string $introfiles = '[]',
         int $visible = 1,
         int $cutoffdate = 0,
-        int $introattachments = 0
+        int $introattachments = 0,
+        int $onlinetext = 0
     ): array {
         global $CFG, $DB, $USER;
 
@@ -61,6 +63,7 @@ class create_assignment extends external_api {
             'visible' => $visible,
             'cutoffdate' => $cutoffdate,
             'introattachments' => $introattachments,
+            'onlinetext' => $onlinetext,
         ]);
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
@@ -112,6 +115,10 @@ class create_assignment extends external_api {
             'assignsubmission_comments_enabled' => 1,
             'assignfeedback_comments_enabled' => 1,
         ];
+        if ($params['onlinetext'] === 1) {
+            $properties['assignsubmission_onlinetext_enabled'] = 1;
+            $properties['assignsubmission_file_enabled'] = 0;
+        }
         if (!empty($params['introattachments'])) {
             $properties['introattachments'] = $params['introattachments'];
         }
